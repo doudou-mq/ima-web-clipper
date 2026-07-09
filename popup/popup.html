@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IMA Web Clipper</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+
+    <h2 class="app-title">IMA Web Clipper</h2>
+
+    <!-- State: Not configured -->
+    <div class="state" id="state-empty">
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <h3>还未完成设置</h3>
+        <p>请先到设置页配置 API 凭证<br>并选择目标知识库</p>
+        <button id="btn-open-settings" class="btn btn-primary btn-full">⚙️ 打开设置页面</button>
+      </div>
+    </div>
+
+    <!-- State: Ready to clip -->
+    <div class="state" id="state-ready">
+      <div class="config-bar">
+        <span class="config-check">✅</span>
+        <span>已连接到 </span>
+        <strong id="config-kb-name">知识库</strong>
+        <button id="btn-config-link" class="config-link">设置</button>
+      </div>
+
+      <!-- Template Preview -->
+      <div class="tpl-card">
+        <div class="tpl-head">
+          <span>📄 预览效果</span>
+          <select id="tpl-switcher" class="tpl-switcher"></select>
+        </div>
+        <div class="tpl-body">
+          <div id="tpl-body-content" class="tpl-body-content">
+            <div style="padding:20px;text-align:center;color:#94A3B8;font-size:12px;">正在提取页面内容...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KB Select -->
+      <div class="form-group">
+        <label>目标知识库</label>
+        <select id="kb-select"><option value="">加载中...</option></select>
+      </div>
+
+      <button id="btn-clip" class="btn btn-primary btn-full">✨ 添加到 ima.copilot</button>
+    </div>
+
+    <!-- State: Clipping -->
+    <div class="state" id="state-clipping">
+      <div class="clip-progress">
+        <div class="clip-icon">⏳</div>
+        <h4>正在保存到 ima.copilot...</h4>
+        <p class="clip-status-text" id="clip-status-text">请稍候</p>
+      </div>
+    </div>
+
+    <!-- State: Done -->
+    <div class="state" id="state-done">
+      <div class="clip-done">
+        <div class="done-icon">✅</div>
+        <h4>添加成功！</h4>
+        <p>已保存到 <strong id="done-kb-label">知识库</strong></p>
+        <button id="btn-back-to-ready" class="btn btn-secondary btn-full">↩️ 继续添加</button>
+      </div>
+    </div>
+
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

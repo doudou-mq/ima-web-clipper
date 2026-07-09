@@ -1,0 +1,36 @@
+{
+  "name": "ima-web-clipper",
+  "version": "1.0.0",
+  "description": "一键剪藏网页内容到 IMA 知识库的浏览器插件",
+  "main": "background/service-worker.js",
+  "scripts": {
+    "build": "echo '构建脚本待实现'",
+    "dev": "echo '开发模式待实现'",
+    "test": "echo '测试脚本待实现'",
+    "lint": "echo '代码检查待实现'",
+    "pack": "zip -r ima-web-clipper.zip . -x \"*.git*\" \"*.DS_Store\" \"node_modules/*\""
+  },
+  "keywords": [
+    "ima",
+    "web-clipper",
+    "browser-extension",
+    "chrome-extension",
+    "edge-extension"
+  ],
+  "author": "IMA Web Clipper Team",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/ima-web-clipper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/ima-web-clipper/issues"
+  },
+  "homepage": "https://github.com/your-org/ima-web-clipper#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

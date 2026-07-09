@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IMA Web Clipper - 设置</title>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      font-size: 14px; line-height: 1.6; color: #0F172A;
+      background: #F8FAFC; min-height: 100vh;
+    }
+    .app-layout { display: flex; min-height: 100vh; }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+
+    .sidebar {
+      width: 200px; min-width: 200px; max-width: 200px;
+      flex-shrink: 0; flex-grow: 0;
+      background: #fff; border-right: 1px solid #E2E8F0;
+      display: flex; flex-direction: column;
+      position: sticky; top: 0; height: 100vh;
+    }
+    .sidebar-brand { padding: 20px 18px 16px; border-bottom: 1px solid #E2E8F0; }
+    .sidebar-brand h1 { font-size: 16px; font-weight: 700; color: #4F46E5; margin-bottom: 2px; }
+    .sidebar-brand p { font-size: 11px; color: #94A3B8; }
+    .sidebar-nav { flex: 1; padding: 12px 0; }
+    .sidebar-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 20px; font-size: 13px; font-weight: 500;
+      color: #475569; cursor: pointer; transition: all .15s;
+      border-left: 3px solid transparent; user-select: none;
+    }
+    .sidebar-item:hover { background: #F1F5F9; color: #0F172A; }
+    .sidebar-item.active { background: #EEF2FF; color: #4F46E5; font-weight: 600; border-left-color: #4F46E5; }
+    .sidebar-footer { padding: 14px 18px; border-top: 1px solid #E2E8F0; font-size: 11px; color: #94A3B8; }
+
+    .content { flex: 1; padding: 32px 40px; overflow-y: auto; }
+    .panel { display: none; animation: fadeIn .25s ease; }
+    .panel.active { display: block; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+    .panel-header { margin-bottom: 24px; }
+    .panel-header h2 { font-size: 20px; font-weight: 600; color: #0F172A; margin-bottom: 4px; }
+    .panel-header p { font-size: 13px; color: #94A3B8; }
+
+    .section { background: #fff; border: 1px solid #E2E8F0; border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+    .section.disabled { opacity: .45; pointer-events: none; }
+    .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .section-head h3 { font-size: 15px; font-weight: 600; color: #0F172A; display: flex; align-items: center; gap: 6px; }
+
+    .badge { font-size: 11px; padding: 2px 10px; border-radius: 10px; font-weight: 500; }
+    .badge-pending { background: #FEF3C7; color: #D97706; }
+    .badge-ready { background: #D1FAE5; color: #059669; }
+    .badge-error { background: #FEE2E2; color: #DC2626; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #374151; }
+    .form-group .hint { font-size: 11px; color: #94A3B8; margin-top: 3px; }
+    .form-row { display: flex; gap: 14px; }
+    .form-row .form-group { flex: 1; }
+
+    input[type="text"], input[type="password"], textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 8px;
+      font-size: 13px; font-family: inherit; transition: border-color .2s, box-shadow .2s; background: #fff;
+    }
+    input:focus, textarea:focus { outline: none; border-color: #4F46E5; box-shadow: 0 0 0 3px rgba(79,70,229,.12); }
+    textarea { min-height: 120px; resize: vertical; font-family: 'SF Mono', Monaco, Menlo, monospace; font-size: 12px; line-height: 1.6; }
+    input::placeholder, textarea::placeholder { color: #CBD5E1; }
+
+    .checkbox { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; color: #475569; }
+    .checkbox input[type="checkbox"] { width: auto; accent-color: #4F46E5; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 9px 18px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s; line-height: 1.2;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: #4F46E5; color: #fff; }
+    .btn-primary:hover { background: #4338CA; }
+    .btn-success { background: #059669; color: #fff; }
+    .btn-success:hover { background: #047857; }
+    .btn-secondary { background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0; }
+    .btn-secondary:hover { background: #E2E8F0; }
+    .btn-link { background: none; color: #4F46E5; padding: 4px 6px; font-size: 12px; }
+    .btn-link:hover { text-decoration: underline; }
+    .btn-sm { padding: 5px 12px; font-size: 11px; border-radius: 6px; }
+    .btn-full { width: 100%; justify-content: center; }
+
+    .status-msg { display: none; padding: 10px 14px; border-radius: 8px; font-size: 12px; margin-top: 12px; gap: 6px; align-items: flex-start; }
+    .status-msg.show { display: flex; }
+    .status-msg.info { background: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; }
+    .status-msg.success { background: #D1FAE5; color: #059669; border: 1px solid #A7F3D0; }
+    .status-msg.error { background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; }
+    .status-msg.warning { background: #FEF3C7; color: #D97706; border: 1px solid #FDE68A; }
+
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .kb-tree { list-style: none; }
+    .kb-root {
+      background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px;
+      padding: 14px 16px; margin-bottom: 8px; cursor: pointer;
+      display: flex; align-items: center; gap: 10px; transition: all .15s;
+    }
+    .kb-root:hover { border-color: #C7D2FE; background: #F1F5F9; }
+    .kb-root .kr-icon { width: 30px; height: 30px; border-radius: 7px; background: #EEF2FF; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+    .kb-root .kr-info { flex: 1; }
+    .kb-root .kr-info .kr-name { font-weight: 600; font-size: 13px; color: #0F172A; }
+    .kb-root .kr-info .kr-desc { font-size: 11px; color: #94A3B8; }
+    .kb-root .kr-arrow { font-size: 11px; color: #CBD5E1; transition: transform .2s; }
+    .kb-root.open .kr-arrow { transform: rotate(90deg); }
+    .kb-tree-container { display: none; padding-left: 24px; margin-bottom: 4px; }
+    .kb-tree-container.open { display: block; }
+    .tree-node { list-style: none; }
+    .node-row { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; cursor: pointer; transition: all .12s; font-size: 12px; }
+    .node-row:hover { background: #F1F5F9; }
+    .node-row .nd-icon { font-size: 14px; flex-shrink: 0; }
+    .node-row .nd-name { flex: 1; color: #334155; }
+    .node-row .nd-arrow { font-size: 10px; color: #CBD5E1; transition: transform .2s; display: inline-block; }
+    .node-row.open .nd-arrow { transform: rotate(90deg); }
+    .node-row .nd-check { color: #4F46E5; font-size: 12px; opacity: 0; }
+    .tree-node.selected > .node-row .nd-check { opacity: 1; }
+    .tree-node.selected > .node-row { background: #EEF2FF; }
+    .tree-children { display: none; padding-left: 18px; list-style: none; }
+    .tree-children.open { display: block; }
+
+    .tpl-mgr { display: flex; border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden; background: #fff; }
+    .tpl-list { width: 200px; flex-shrink: 0; border-right: 1px solid #E2E8F0; background: #F8FAFC; }
+    .tpl-list-head { padding: 12px 14px; border-bottom: 1px solid #E2E8F0; font-size: 11px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: .5px; display: flex; justify-content: space-between; }
+    .tpl-list-items { list-style: none; max-height: 420px; overflow-y: auto; }
+    .tpl-list-item { padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #F1F5F9; transition: all .1s; font-size: 13px; display: flex; align-items: center; gap: 6px; color: #475569; }
+    .tpl-list-item:hover { background: #F1F5F9; }
+    .tpl-list-item.active { background: #EEF2FF; color: #4F46E5; font-weight: 600; }
+
+    .tpl-editor { flex: 1; display: flex; flex-direction: column; }
+    .tpl-tabs { display: flex; border-bottom: 1px solid #E2E8F0; background: #F8FAFC; }
+    .tpl-tab { padding: 8px 16px; font-size: 12px; border: none; background: transparent; cursor: pointer; font-weight: 500; color: #94A3B8; border-bottom: 2px solid transparent; transition: all .15s; }
+    .tpl-tab:hover { color: #475569; }
+    .tpl-tab.active { color: #4F46E5; border-bottom-color: #4F46E5; background: #fff; }
+
+    .tpl-body { padding: 16px; }
+    .tpl-body .edit-pane { display: none; }
+    .tpl-body .edit-pane.active { display: block; }
+    .tpl-body textarea { min-height: 300px; }
+    .tpl-body .preview-pane { display: none; min-height: 300px; max-height: 420px; overflow-y: auto; padding: 16px; border: 1px solid #E2E8F0; border-radius: 7px; font-size: 13px; line-height: 1.7; background: #fff; }
+    .tpl-body .preview-pane.active { display: block; }
+    .preview-pane h1 { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+    .preview-pane h2 { font-size: 16px; font-weight: 600; margin-bottom: 8px; margin-top: 16px; }
+    .preview-pane h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; margin-top: 12px; }
+    .preview-pane p { margin-bottom: 8px; }
+    .preview-pane code { background: #F1F5F9; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+    .preview-pane pre { background: #F1F5F9; padding: 10px; border-radius: 6px; margin: 8px 0; }
+    .preview-pane blockquote { border-left: 3px solid #4F46E5; padding-left: 12px; color: #64748B; margin: 8px 0; }
+    .preview-pane ul, .preview-pane ol { padding-left: 20px; margin-bottom: 8px; }
+    .preview-pane a { color: #4F46E5; }
+    .preview-pane hr { border: none; border-top: 1px solid #E2E8F0; margin: 12px 0; }
+    .preview-pane .yaml-meta { font-size: 11px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; color: #64748B; font-family: SF Mono, Monaco, monospace; }
+    .preview-pane .yaml-meta .ym-title { font-weight: 600; color: #4F46E5; margin-bottom: 4px; }
+
+    .tpl-footer { padding: 10px 14px; border-top: 1px solid #E2E8F0; display: flex; gap: 8px; align-items: center; }
+    .about-list { padding-left: 18px; margin: 8px 0; }
+    .about-list li { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <h1>IMA Web Clipper</h1>
+      <p>设置</p>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav">
+      <div class="sidebar-item active" data-panel="panel-credentials">🔑 凭证配置</div>
+      <div class="sidebar-item" data-panel="panel-knowledge">📚 知识库</div>
+      <div class="sidebar-item" data-panel="panel-templates">📝 模板管理</div>
+      <div class="sidebar-item" data-panel="panel-about">ℹ️ 关于</div>
+    </nav>
+    <div class="sidebar-footer">v1.0.0 · IMA Web Clipper</div>
+  </aside>
+
+  <!-- ===== CONTENT ===== -->
+  <main class="content">
+
+    <!-- 凭证配置 -->
+    <div class="panel active" id="panel-credentials">
+      <div class="panel-header">
+        <h2>🔑 凭证配置</h2>
+        <p>配置 IMA API 凭证以连接到你的知识库</p>
+      </div>
+      <div class="section" id="sec-credentials">
+        <div class="section-head">
+          <h3>API 凭证</h3>
+          <span class="badge badge-pending" id="badge-cred">未配置</span>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="input-client-id">Client ID</label>
+            <input type="text" id="input-client-id" placeholder="输入你的 IMA Client ID" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="input-api-key">API Key</label>
+            <input type="password" id="input-api-key" placeholder="输入你的 IMA API Key" autocomplete="off">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="checkbox">
+            <input type="checkbox" id="input-remember-creds" checked>
+            记住凭证（本地存储）
+          </label>
+          <div class="hint">⚠️ 勾选后凭证存储在当前设备，公共电脑请勿勾选</div>
+        </div>
+        <button class="btn btn-primary" id="btn-test-conn">🔗 测试连接</button>
+        <div class="status-msg" id="status-conn"></div>
+      </div>
+      <div class="section" id="sec-after-conn" style="display:none;">
+        <div class="section-head">
+          <h3>✅ 连接成功</h3>
+          <span class="badge badge-ready">已完成</span>
+        </div>
+        <p style="font-size:13px;color:#64748B;margin-bottom:14px;">请前往左侧面板继续配置：</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-secondary" id="btn-goto-kb">📚 选择知识库与文件夹</button>
+          <button class="btn btn-secondary" id="btn-goto-templates">📝 配置剪藏模板</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 知识库 -->
+    <div class="panel" id="panel-knowledge">
+      <div class="panel-header">
+        <h2>📚 知识库</h2>
+        <p>浏览知识库内容并选择目标保存位置</p>
+      </div>
+      <div class="section" id="sec-kb">
+        <div class="section-head">
+          <h3>知识库内容</h3>
+          <span class="badge badge-pending" id="badge-kb">请先测试连接</span>
+        </div>
+        <p id="kb-help-text" style="font-size:13px;color:#94A3B8;margin-bottom:14px;">
+          连接成功后，点击下方按钮获取知识库的文件夹与文档结构。点击节点展开/折叠，选中文档作为剪藏目标。
+        </p>
+        <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;">
+          <button class="btn btn-primary" id="btn-refresh-kb-tree">🔄 获取知识库结构</button>
+          <span id="kb-loading-text" style="font-size:12px;color:#94A3B8;display:none;"><span class="spinner"></span> 正在获取...</span>
+          <span id="kb-source-label" style="font-size:11px;color:#CBD5E1;display:none;"></span>
+        </div>
+        <div id="kb-tree-root"></div>
+        <div class="status-msg" id="status-kb"></div>
+      </div>
+    </div>
+
+    <!-- 模板管理 -->
+    <div class="panel" id="panel-templates">
+      <div class="panel-header">
+        <h2>📝 模板管理</h2>
+        <p>自定义 Markdown 模板，支持 YAML 元数据（标题/作者/日期/关键词/标签）</p>
+      </div>
+      <div class="tpl-mgr">
+        <div class="tpl-list">
+          <div class="tpl-list-head"><span>模板</span><span id="tpl-count">0 个</span></div>
+          <ul class="tpl-list-items" id="tpl-list-items"></ul>
+          <div style="padding:8px 10px;border-top:1px solid #E2E8F0;">
+            <button class="btn btn-sm btn-secondary btn-full" id="btn-new-template">+ 新建模板</button>
+          </div>
+        </div>
+        <div class="tpl-editor">
+          <div class="tpl-tabs" id="tpl-tabs">
+            <button class="tpl-tab active" data-tab="edit">✏️ 编辑</button>
+            <button class="tpl-tab" data-tab="preview">👁️ 预览</button>
+          </div>
+          <div class="tpl-body">
+            <div class="edit-pane active" id="pane-edit">
+              <div class="form-group">
+                <label for="tpl-edit-name">模板名称</label>
+                <input type="text" id="tpl-edit-name" placeholder="模板显示名称">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label>Markdown 内容 <span style="font-weight:400;color:#94A3B8;">（YAML frontmatter + 模板变量）</span></label>
+                <textarea id="tpl-edit-content" placeholder="以 --- 开头编写 YAML 元数据，然后写 Markdown 模板"></textarea>
+              </div>
+            </div>
+            <div class="preview-pane" id="pane-preview"></div>
+          </div>
+          <div class="tpl-footer">
+            <button class="btn btn-primary btn-sm" id="btn-save-template">💾 保存</button>
+            <button class="btn btn-secondary btn-sm" id="btn-reset-template">↩️ 重置</button>
+            <span style="font-size:11px;color:#94A3B8;margin-left:auto;">
+              变量: {{title}} {{url}} {{date}} {{content}} {{excerpt}} {{author}} {{selection}}
+            </span>
+          </div>
+          <div class="status-msg" id="status-tpl" style="margin:0 14px 10px;"></div>
+        </div>
+      </div>
+      <details style="margin-top:16px;font-size:12px;color:#94A3B8;cursor:pointer;">
+        <summary style="user-select:none;">📖 查看可用变量说明</summary>
+        <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;">
+          <div style="padding:6px 10px;background:#F8FAFC;border-radius:6px;"><code style="color:#4F46E5;">{{title}}</code> — 文章标题</div>
+          <div style="padding:6px 10px;background:#F8FAFC;border-radius:6px;"><code style="color:#4F46E5;">{{url}}</code> — 网页 URL</div>
+          <div style="padding:6px 10px;background:#F8FAFC;border-radius:6px;"><code style="color:#4F46E5;">{{date}}</code> — 剪藏时间</div>
+          <div style="padding:6px 10px;background:#F8FAFC;border-radius:6px;"><code style="color:#4F46E5;">{{content}}</code> — 文章内容 (Markdown)</div>
+          <div style="padding:6px 10px;background:#F8FAFC;border-radius:6px;"><code style="color:#4F46E5;">{{excerpt}}</code> — 文章摘要</div>
+          <div style="padding:6px 10px;background:#F8FAFC;border-radius:6px;"><code style="color:#4F46E5;">{{author}}</code> — 文章作者</div>
+          <div style="padding:6px 10px;background:#F8FAFC;border-radius:6px;"><code style="color:#4F46E5;">{{selection}}</code> — 选中文本</div>
+        </div>
+      </details>
+    </div>
+
+    <!-- 关于 -->
+    <div class="panel" id="panel-about">
+      <div class="panel-header">
+        <h2>ℹ️ 关于</h2>
+        <p>IMA Web Clipper 浏览器扩展</p>
+      </div>
+      <div class="section">
+        <p style="color:#475569;"><strong>版本：</strong>v1.0.0</p>
+        <p style="color:#475569;"><strong>技术栈：</strong>Manifest V3 · 原生 JS · Readability.js · Turndown.js</p>
+        <br>
+        <p style="font-weight:600;">功能：</p>
+        <ul class="about-list" style="color:#475569;">
+          <li>📄 三种剪藏模式：完整 / 选区 / URL</li>
+          <li>📝 自定义 Markdown 模板（支持 YAML frontmatter）</li>
+          <li>⌨️ 快捷键 Ctrl+Shift+S / Cmd+Shift+S</li>
+          <li>🖱️ 右键菜单快速剪藏</li>
+          <li>🔐 分级安全存储（Session / Local）</li>
+          <li>📂 知识库树形浏览与文件夹选择</li>
+        </ul>
+      </div>
+    </div>
+
+  </main>
+</div>
+<script src="options.js"></script>
+</body>
+</html>
