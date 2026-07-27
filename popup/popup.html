@@ -30,16 +30,33 @@
         <button id="btn-config-link" class="config-link">设置</button>
       </div>
 
-      <!-- Template Preview -->
-      <div class="tpl-card">
-        <div class="tpl-head">
-          <span>📄 预览效果</span>
-          <select id="tpl-switcher" class="tpl-switcher"></select>
-        </div>
-        <div class="tpl-body">
-          <div id="tpl-body-content" class="tpl-body-content">
-            <div style="padding:20px;text-align:center;color:#94A3B8;font-size:12px;">正在提取页面内容...</div>
+      <!-- Mode Tabs -->
+      <div class="mode-tabs" id="mode-tabs">
+        <div class="mode-tab active" data-mode="full">📄 完整内容</div>
+        <div class="mode-tab" data-mode="url">🔗 仅 URL</div>
+      </div>
+
+      <!-- Panel: Markdown Preview (only in full mode) -->
+      <div id="panel-full" class="mode-panel">
+        <div class="tpl-card">
+          <div class="tpl-head">
+            <span>📄 预览效果</span>
+            <select id="tpl-switcher" class="tpl-switcher"></select>
           </div>
+          <div class="tpl-body">
+            <div id="tpl-body-content" class="tpl-body-content">
+              <div style="padding:20px;text-align:center;color:#94A3B8;font-size:12px;">正在提取页面内容...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel: URL hint (only in url mode) -->
+      <div id="panel-url" class="mode-panel" style="display:none;">
+        <div class="url-hint">
+          <div class="url-hint-icon">🔗</div>
+          <div class="url-hint-text">将当前页面链接保存到知识库</div>
+          <div class="url-hint-desc">由 IMA 服务端抓取页面内容，无需本地提取转换</div>
         </div>
       </div>
 

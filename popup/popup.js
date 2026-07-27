@@ -1,6 +1,6 @@
 /**
  * IMA Web Clipper - Popup
- * 实时预览：打开弹窗时自动提取当前页面内容并渲染模板
+ * 支持 MD 完整内容 / 仅 URL 两种保存模式
  */
 
 const $ = id => document.getElementById(id);
@@ -14,6 +14,9 @@ function initDOM() {
   els.btnOpenSettings = $('btn-open-settings');
   els.configKbName = $('config-kb-name');
   els.btnConfigLink = $('btn-config-link');
+  els.modeTabs = $('mode-tabs');
+  els.panelFull = $('panel-full');
+  els.panelUrl = $('panel-url');
   els.tplSwitcher = $('tpl-switcher');
   els.tplBodyContent = $('tpl-body-content');
   els.kbSelect = $('kb-select');
@@ -21,15 +24,13 @@ function initDOM() {
   els.btnBackToReady = $('btn-back-to-ready');
   els.clipStatusText = $('clip-status-text');
   els.doneKbLabel = $('done-kb-label');
-  els.previewHeader = $('preview-header');
 }
 
 let configState = { configured: false };
 let templates = [];
 let knowledgeBases = [];
-
-// 缓存当前页面的提取结果（用于模板切换时不重复提取）
 let cachedPreview = null;
+let currentMode = 'full'; // 'full' | 'url'
 
 // ===== 初始化 =====
 async function initApp() {
@@ -59,7 +60,6 @@ async function initApp() {
   if (configState.configured) {
     showState('ready');
     showReadyState();
-    // 触发实时预览
     loadPagePreview();
   } else {
     showState('empty');
@@ -76,9 +76,27 @@ function bindEvents() {
   els.tplSwitcher.addEventListener('change', function() {
     renderTemplatePreview(this.value);
   });
+
+  // 模式切换 — 事件代理
+  els.modeTabs.addEventListener('click', function(e) {
+    const tab = e.target.closest('.mode-tab');
+    if (!tab) return;
+    if (tab.classList.contains('active')) return;
+    // 切换 tab 状态
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    // 切换面板
+    currentMode = tab.dataset.mode;
+    els.panelFull.style.display = currentMode === 'full' ? 'block' : 'none';
+    els.panelUrl.style.display = currentMode === 'url' ? 'block' : 'none';
+    // 更新按钮文字
+    els.btnClip.textContent = currentMode === 'full'
+      ? '✨ 添加到 ima.copilot'
+      : '🔗 保存 URL 到 ima.copilot';
+  });
 }
 
-// ===== 实时预览：提取当前页面内容 =====
+// ===== 实时预览 =====
 async function loadPagePreview() {
   els.tplBodyContent.innerHTML = '<div style="padding:20px;text-align:center;color:#94A3B8;"><span class="spinner"></span> 正在提取页面内容...</div>';
 
@@ -105,7 +123,7 @@ async function loadPagePreview() {
   }
 }
 
-// ===== 模板切换器 =====
+// ===== 模板切换 =====
 function populateTplSwitcher() {
   els.tplSwitcher.innerHTML = '';
   templates.forEach(tpl => {
@@ -120,13 +138,11 @@ function populateTplSwitcher() {
   }
 }
 
-// ===== 模板渲染（使用缓存的页面数据）=====
+// ===== 模板渲染 =====
 function renderTemplatePreview(tplId) {
   const tpl = templates.find(t => t.id === (tplId || els.tplSwitcher.value)) || templates[0];
   if (!tpl) return;
 
-  // 如果有缓存数据，用真实的页面数据填充模板
-  // 否则用回退数据
   const data = cachedPreview ? {
     title: cachedPreview.title || '无标题',
     url: cachedPreview.url || '',
@@ -147,17 +163,15 @@ function renderTemplatePreview(tplId) {
     selection: ''
   };
 
-  // 替换变量
   let text = tpl.content;
   for (const [key, value] of Object.entries(data)) {
     text = text.replace(new RegExp('{{' + key + '}}', 'g'), value);
   }
 
-  // 渲染 Markdown → HTML
   els.tplBodyContent.innerHTML = renderMarkdown(text);
 }
 
-// ===== Markdown → HTML 渲染 =====
+// ===== Markdown → HTML =====
 function renderMarkdown(md) {
   if (!md || md.trim() === '') return '<div style="color:#94A3B8;font-size:12px;padding:8px;">无内容预览</div>';
 
@@ -217,6 +231,12 @@ function showState(name) {
 function showReadyState() {
   els.configKbName.textContent = configState.knowledgeBase || '知识库';
   populateKbSelect();
+  // 重置为完整内容模式
+  currentMode = 'full';
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'full'));
+  els.panelFull.style.display = 'block';
+  els.panelUrl.style.display = 'none';
+  els.btnClip.textContent = '✨ 添加到 ima.copilot';
 }
 
 // ===== 知识库下拉 =====
@@ -246,18 +266,48 @@ function onKbChange() {
 // ===== 剪藏 =====
 async function startClip() {
   const kbId = els.kbSelect.value;
-  if (!kbId || !cachedPreview) return;
+  if (!kbId) return;
 
+  if (currentMode === 'url') {
+    // URL 模式：直接传 URL 给后台
+    showState('clipping');
+    try {
+      const config = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' });
+      if (!config || !config.credentials) { showState('ready'); return; }
+
+      const [tab] = await chrome.tabs.query({ active: true, windowType: 'normal', status: 'complete' });
+      if (!tab || !tab.url || tab.url.startsWith('chrome-extension://') || tab.url.startsWith('chrome://')) {
+        showState('ready'); return;
+      }
+
+      const response = await chrome.runtime.sendMessage({
+        type: 'CLIP_PAGE',
+        tabId: tab.id,
+        credentials: config.credentials,
+        knowledgeBaseId: kbId,
+        clippingMode: 'url-only'
+      });
+
+      if (response && response.success) {
+        showState('done');
+        els.doneKbLabel.textContent = els.kbSelect.options[els.kbSelect.selectedIndex]?.textContent?.replace('📚 ', '') || '知识库';
+      } else {
+        showState('ready');
+      }
+    } catch (e) {
+      showState('ready');
+    }
+    return;
+  }
+
+  // MD 模式：复用缓存内容
+  if (!cachedPreview) return;
   showState('clipping');
 
   try {
     const config = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' });
-    if (!config || !config.credentials) {
-      showState('ready');
-      return;
-    }
+    if (!config || !config.credentials) { showState('ready'); return; }
 
-    // 复用预览已提取好的内容，直接保存到 API
     const response = await chrome.runtime.sendMessage({
       type: 'SAVE_CLIPPED_CONTENT',
       credentials: config.credentials,
@@ -272,8 +322,7 @@ async function startClip() {
 
     if (response && response.success) {
       showState('done');
-      const name = els.kbSelect.options[els.kbSelect.selectedIndex]?.textContent?.replace('📚 ', '') || '知识库';
-      els.doneKbLabel.textContent = name;
+      els.doneKbLabel.textContent = els.kbSelect.options[els.kbSelect.selectedIndex]?.textContent?.replace('📚 ', '') || '知识库';
     } else {
       showState('ready');
     }
