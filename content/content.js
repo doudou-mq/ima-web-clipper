@@ -534,12 +534,67 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       break;
     }
 
+    case 'SHOW_TOAST': {
+      // 右键保存结果反馈
+      showToast(request.message, request.success !== false);
+      sendResponse({ success: true });
+      break;
+    }
+
     default:
       sendResponse({ success: false, error: '未知的消息类型' });
   }
 
   return true; // 保持消息通道
 });
+
+// ===== 页面浮动提示 (toast) =====
+function showToast(message, isSuccess) {
+  try {
+    // 移除旧 toast
+    const old = document.getElementById('ima-clipper-toast');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+
+    const toast = document.createElement('div');
+    toast.id = 'ima-clipper-toast';
+    toast.setAttribute('role', 'status');
+    toast.innerHTML =
+      '<span style="margin-right:6px;">' + (isSuccess ? '✅' : '❌') + '</span>' +
+      '<span>' + message + '</span>';
+
+    const color = isSuccess ? '#059669' : '#DC2626';
+    const bg = isSuccess ? '#ECFDF5' : '#FEF2F2';
+    const border = isSuccess ? '#A7F3D0' : '#FECACA';
+
+    toast.style.cssText =
+      'position:fixed;bottom:24px;right:24px;z-index:2147483647;' +
+      'display:flex;align-items:center;' +
+      'padding:12px 16px;border-radius:10px;font-size:13px;font-weight:500;' +
+      'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;' +
+      'background:' + bg + ';color:' + color + ';border:1px solid ' + border + ';' +
+      'box-shadow:0 4px 16px rgba(0,0,0,.12);' +
+      'animation:imaToastIn .25s ease;' +
+      'pointer-events:none;';
+
+    // 注入动画 keyframes
+    if (!document.getElementById('ima-clipper-toast-style')) {
+      const style = document.createElement('style');
+      style.id = 'ima-clipper-toast-style';
+      style.textContent =
+        '@keyframes imaToastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}';
+      document.head.appendChild(style);
+    }
+
+    document.body.appendChild(toast);
+
+    // 3 秒后自动消失
+    setTimeout(function() {
+      if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 3000);
+  } catch (e) {
+    console.warn('toast 显示失败:', e);
+  }
+}
 
 // ===== 工具函数 =====
 function getFaviconUrl() {

@@ -164,6 +164,99 @@
     .tpl-footer { padding: 10px 14px; border-top: 1px solid #E2E8F0; display: flex; gap: 8px; align-items: center; }
     .about-list { padding-left: 18px; margin: 8px 0; }
     .about-list li { margin-bottom: 4px; }
+
+    /* ===== 使用指南 ===== */
+    .guide-section { margin-bottom: 20px; }
+    .guide-section-title {
+      font-size: 15px; font-weight: 600; color: #0F172A;
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 14px;
+    }
+    /* 步骤列表：每个 li 内 = 步骤行 + 紧跟的图片 */
+    .guide-list { list-style: none; }
+    .guide-item {
+      padding: 10px 12px; border-radius: 10px;
+      margin-bottom: 4px;
+    }
+    .guide-item:hover { background: #F8FAFC; }
+    .guide-step-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 13px; color: #475569; line-height: 1.6;
+    }
+    .gs-num {
+      width: 22px; height: 22px; flex-shrink: 0;
+      border-radius: 50%; background: #4F46E5; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; margin-top: 2px;
+    }
+    .guide-step-row .gs-text { flex: 1; }
+    .guide-step-row .gs-text strong { color: #0F172A; }
+    .guide-step-row .gs-text code {
+      background: #EEF2FF; color: #4F46E5;
+      padding: 1px 5px; border-radius: 4px; font-size: 12px;
+    }
+    /* 图片：缩进对齐文字，定宽居中，卡片样式 */
+    .guide-img-wrap {
+      margin: 12px 0 6px 32px;
+    }
+    .guide-img-caption {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: #64748B; font-weight: 500;
+      margin-bottom: 6px;
+    }
+    .guide-img-caption .gim-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 20px; height: 20px; padding: 0 5px;
+      background: #EEF2FF; color: #4F46E5;
+      border-radius: 6px; font-size: 11px; font-weight: 600;
+    }
+    .guide-img-card {
+      display: inline-block; max-width: 420px; width: 100%;
+      border: 1px solid #E2E8F0; border-radius: 10px; overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+      background: #fff;
+      transition: box-shadow .2s, transform .2s;
+    }
+    .guide-img-card:hover {
+      box-shadow: 0 6px 18px rgba(0,0,0,.12);
+      transform: translateY(-2px);
+    }
+    .guide-img {
+      width: 100%; height: auto; display: block; cursor: zoom-in;
+    }
+    .guide-note {
+      margin-top: 14px; margin-left: 32px;
+      padding: 10px 14px;
+      background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 8px;
+      font-size: 12px; color: #D97706; line-height: 1.6;
+    }
+    /* 配置插件的子步骤图片额外缩进 */
+    .guide-img-indent { margin-left: 56px; }
+    .guide-note-indent { margin-left: 44px; }
+    .guide-sub-step {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 6px 12px 6px 44px;
+      font-size: 13px; color: #475569; line-height: 1.6;
+    }
+    .guide-sub-step .gss-num {
+      width: 20px; height: 20px; flex-shrink: 0;
+      border-radius: 6px; background: #EEF2FF; color: #4F46E5;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600; margin-top: 2px;
+    }
+    .guide-sub-step .gs-text { flex: 1; }
+    .guide-shortcut {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px;
+      margin-bottom: 8px; background: #F8FAFC;
+    }
+    .guide-shortcut .gs-icon { font-size: 20px; }
+    .guide-shortcut .gs-label { font-size: 13px; color: #475569; flex: 1; }
+    .guide-shortcut .gs-key {
+      background: #fff; border: 1px solid #E2E8F0; border-radius: 5px;
+      padding: 3px 8px; font-size: 12px; font-weight: 600; color: #4F46E5;
+      font-family: 'SF Mono', Monaco, monospace;
+    }
   </style>
 </head>
 <body>
@@ -179,6 +272,7 @@
       <div class="sidebar-item active" data-panel="panel-credentials">🔑 凭证配置</div>
       <div class="sidebar-item" data-panel="panel-knowledge">📚 知识库</div>
       <div class="sidebar-item" data-panel="panel-templates">📝 模板管理</div>
+      <div class="sidebar-item" data-panel="panel-guide">📖 使用指南</div>
       <div class="sidebar-item" data-panel="panel-about">ℹ️ 关于</div>
     </nav>
     <div class="sidebar-footer">v1.0.0 · IMA Web Clipper</div>
@@ -311,6 +405,132 @@
       </details>
     </div>
 
+    <!-- 使用指南 -->
+    <div class="panel" id="panel-guide">
+      <div class="panel-header">
+        <h2>📖 使用指南</h2>
+        <p>安装 · 配置 · 使用（与官方教程一致）</p>
+      </div>
+
+      <!-- ===== 一、安装插件 ===== -->
+      <div class="section guide-section">
+        <div class="guide-section-title">📦 一、安装插件</div>
+        <ul class="guide-list">
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">1</span><span class="gs-text">先把压缩包解压到一个固定目录（比如 <code>D:\chrome_ext\</code>），解压后里面应该能看到 <code>manifest.json</code> 文件，这说明解压对了。</span></div>
+            <div class="guide-note">💡 路径别放桌面之类容易误删的地方，开发者模式加载的插件依赖原路径，挪了就失效。</div>
+          </li>
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">2</span><span class="gs-text">打开浏览器，地址栏输入 <code>chrome://extensions/</code> 回车，进扩展管理页。（如果无法打开，可以尝试 <code>se://extensions/</code>）</span></div>
+          </li>
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">3</span><span class="gs-text">右上角打开 <strong>「开发者模式」</strong>开关（变蓝）。</span></div>
+            <div class="guide-img-wrap">
+              <div class="guide-img-caption"><span class="gim-badge">图1</span>开启「开发者模式」</div>
+              <span class="guide-img-card"><img class="guide-img" src="../assets/guide/1.webp" alt="开启开发者模式"></span>
+            </div>
+          </li>
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">4</span><span class="gs-text">点击 <strong>「加载已解压的扩展程序」</strong>，选中第 1 步那个解压后的文件夹，确定。</span></div>
+            <div class="guide-img-wrap">
+              <div class="guide-img-caption"><span class="gim-badge">图2</span>点击「加载已解压的扩展程序」</div>
+              <span class="guide-img-card"><img class="guide-img" src="../assets/guide/2.webp" alt="加载已解压的扩展程序"></span>
+            </div>
+            <div class="guide-img-wrap">
+              <div class="guide-img-caption"><span class="gim-badge">图3</span>选中解压后的文件夹，确定</div>
+              <span class="guide-img-card"><img class="guide-img" src="../assets/guide/3.webp" alt="选择插件文件夹"></span>
+            </div>
+          </li>
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">5</span><span class="gs-text">装完会在扩展列表里出现，工具栏也能看到图标，就能用了。</span></div>
+            <div class="guide-img-wrap">
+              <div class="guide-img-caption"><span class="gim-badge">图4</span>装完在扩展列表里出现</div>
+              <span class="guide-img-card"><img class="guide-img" src="../assets/guide/4.webp" alt="安装完成"></span>
+            </div>
+          </li>
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">6</span><span class="gs-text">工具栏的插件按钮，可以看到，并且可以设置为置顶。</span></div>
+            <div class="guide-img-wrap">
+              <div class="guide-img-caption"><span class="gim-badge">图5</span>工具栏按钮可以设置为置顶</div>
+              <span class="guide-img-card"><img class="guide-img" src="../assets/guide/5.webp" alt="工具栏图标置顶"></span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- ===== 二、配置插件 ===== -->
+      <div class="section guide-section">
+        <div class="guide-section-title">🔑 二、配置插件</div>
+        <ul class="guide-list">
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">1</span><span class="gs-text">如果第一次使用插件，或者未正确配置插件，打开插件时会提示去配置。</span></div>
+            <div class="guide-img-wrap">
+              <div class="guide-img-caption"><span class="gim-badge">图6</span>未配置时打开插件会提示去配置</div>
+              <span class="guide-img-card"><img class="guide-img" src="../assets/guide/6.webp" alt="未配置提示"></span>
+            </div>
+          </li>
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">2</span><span class="gs-text">以上信息可以在 ima 的界面找到：</span></div>
+          </li>
+        </ul>
+        <div class="guide-sub-step"><span class="gss-num">①</span><span class="gs-text">前往 <strong>Claw 配置界面</strong></span></div>
+        <div class="guide-img-wrap guide-img-indent">
+          <div class="guide-img-caption"><span class="gim-badge">图7</span>前往 Claw 配置界面</div>
+          <span class="guide-img-card"><img class="guide-img" src="../assets/guide/7.webp" alt="Claw配置界面"></span>
+        </div>
+        <div class="guide-sub-step"><span class="gss-num">②</span><span class="gs-text">获得 <strong>Client ID</strong> 和 <strong>API KEY</strong></span></div>
+        <div class="guide-img-wrap guide-img-indent">
+          <div class="guide-img-caption"><span class="gim-badge">图8</span>获得 Client ID 和 API KEY</div>
+          <span class="guide-img-card"><img class="guide-img" src="../assets/guide/8.webp" alt="获取凭证"></span>
+        </div>
+        <div class="guide-sub-step"><span class="gss-num">③</span><span class="gs-text">在浏览器插件配置。</span></div>
+        <div class="guide-note guide-note-indent">⚠️ 注意：Client 插件有效期一个月，过期后可以续期。</div>
+      </div>
+
+      <!-- ===== 三、使用插件 ===== -->
+      <div class="section guide-section">
+        <div class="guide-section-title">✂️ 三、使用插件</div>
+        <ul class="guide-list">
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">1</span><span class="gs-text">在希望保存的页面，点击插件 icon</span></div>
+            <div class="guide-img-wrap">
+              <div class="guide-img-caption"><span class="gim-badge">图9</span>在希望保存的页面，点击插件 icon</div>
+              <span class="guide-img-card"><img class="guide-img" src="../assets/guide/9.webp" alt="点击插件图标"></span>
+            </div>
+          </li>
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">2</span><span class="gs-text">选择希望保存的知识库</span></div>
+            <div class="guide-img-wrap">
+              <div class="guide-img-caption"><span class="gim-badge">图10</span>选择希望保存的知识库</div>
+              <span class="guide-img-card"><img class="guide-img" src="../assets/guide/10.webp" alt="选择知识库"></span>
+            </div>
+          </li>
+          <li class="guide-item">
+            <div class="guide-step-row"><span class="gs-num">3</span><span class="gs-text">点击 <strong>「添加到 ima.copilot」</strong>，搞定！</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- ===== 补充：快速剪藏 ===== -->
+      <div class="section guide-section">
+        <div class="guide-section-title">🖱️ 补充：快速剪藏</div>
+        <div class="guide-shortcut">
+          <span class="gs-icon">🖱️</span>
+          <span class="gs-label">右键菜单：页面右键 → 「另存到 IMA」→ 选择剪藏方式</span>
+        </div>
+        <div class="guide-shortcut">
+          <span class="gs-icon">⌨️</span>
+          <span class="gs-label">快捷键：打开插件弹窗</span>
+          <span class="gs-key">Ctrl + Shift + S</span>
+        </div>
+        <div class="guide-shortcut">
+          <span class="gs-icon">🍎</span>
+          <span class="gs-label">Mac 快捷键</span>
+          <span class="gs-key">Cmd + Shift + S</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 关于 -->
     <div class="panel" id="panel-about">
       <div class="panel-header">
@@ -323,10 +543,12 @@
         <br>
         <p style="font-weight:600;">功能：</p>
         <ul class="about-list" style="color:#475569;">
-          <li>📄 三种剪藏模式：完整 / 选区 / URL</li>
+          <li>📄 两种剪藏方式：完整内容 / 仅 URL</li>
+          <li>🖼️ 微信公众号文章专项优化</li>
           <li>📝 自定义 Markdown 模板（支持 YAML frontmatter）</li>
+          <li>👁️ 实时预览：保存前可见最终效果</li>
           <li>⌨️ 快捷键 Ctrl+Shift+S / Cmd+Shift+S</li>
-          <li>🖱️ 右键菜单快速剪藏</li>
+          <li>🖱️ 右键菜单「另存到 IMA」</li>
           <li>🔐 分级安全存储（Session / Local）</li>
           <li>📂 知识库树形浏览与文件夹选择</li>
         </ul>

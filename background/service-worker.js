@@ -415,6 +415,21 @@ function notifyUser(title, message) {
   }
 }
 
+// ===== 页面内浮动提示 =====
+function showPageToast(tabId, message, success) {
+  try {
+    chrome.tabs.sendMessage(tabId, {
+      type: 'SHOW_TOAST',
+      message: message,
+      success: success
+    }).catch(function() {
+      // content script 未注入时忽略（系统通知兜底）
+    });
+  } catch (e) {
+    // 忽略
+  }
+}
+
 // ===== 右键菜单点击 =====
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   (async () => {
@@ -444,12 +459,18 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         clippingMode: mode
       });
       if (result && result.success) {
-        notifyUser('另存到 IMA', mode === 'url-only' ? 'URL 已保存到知识库' : '内容已保存到知识库');
+        const msg = mode === 'url-only' ? 'URL 已保存到知识库' : '内容已保存到知识库';
+        notifyUser('另存到 IMA', msg);
+        showPageToast(tab.id, msg, true);
       } else {
-        notifyUser('另存到 IMA 失败', (result && result.error) || '未知错误');
+        const msg = (result && result.error) || '未知错误';
+        notifyUser('另存到 IMA 失败', msg);
+        showPageToast(tab.id, '另存失败: ' + msg, false);
       }
     } catch (e) {
-      notifyUser('另存到 IMA 失败', e.message || String(e));
+      const msg = e.message || String(e);
+      notifyUser('另存到 IMA 失败', msg);
+      showPageToast(tab.id, '另存失败: ' + msg, false);
     }
   })();
 });
