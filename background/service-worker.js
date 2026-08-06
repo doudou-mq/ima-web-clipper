@@ -17,9 +17,10 @@ function initService() {
 // ===== 右键菜单 =====
 function initContextMenus() {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({ id: 'save-to-ima', title: '另存到 IMA', contexts: ['page'] });
-    chrome.contextMenus.create({ id: 'save-full', parentId: 'save-to-ima', title: '完整剪藏', contexts: ['page'] });
-    chrome.contextMenus.create({ id: 'save-url', parentId: 'save-to-ima', title: '仅保存 URL', contexts: ['page'] });
+    // 同时支持页面右键 和 选中文字右键（selection）
+    chrome.contextMenus.create({ id: 'save-to-ima', title: '另存到 IMA', contexts: ['page', 'selection'] });
+    chrome.contextMenus.create({ id: 'save-full', parentId: 'save-to-ima', title: '完整剪藏', contexts: ['page', 'selection'] });
+    chrome.contextMenus.create({ id: 'save-url', parentId: 'save-to-ima', title: '仅保存 URL', contexts: ['page', 'selection'] });
   });
 }
 
@@ -404,7 +405,7 @@ function notifyUser(title, message) {
   try {
     chrome.notifications.create({
       type: 'basic',
-      iconUrl: 'icons/icon128.png',
+      iconUrl: 'assets/logo.png',
       title: title,
       message: message
     }).catch(function(err) {
