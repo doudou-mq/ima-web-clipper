@@ -12,7 +12,8 @@
     "activeTab",
     "storage",
     "contextMenus",
-    "scripting"
+    "scripting",
+    "notifications"
   ],
   "host_permissions": [
     "https://ima.qq.com/*"

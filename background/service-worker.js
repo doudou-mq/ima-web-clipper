@@ -17,10 +17,9 @@ function initService() {
 // ===== 右键菜单 =====
 function initContextMenus() {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({ id: 'clip-to-ima', title: '剪藏到 IMA', contexts: ['page', 'selection'] });
-    chrome.contextMenus.create({ id: 'clip-full', parentId: 'clip-to-ima', title: '完整剪藏', contexts: ['page'] });
-    chrome.contextMenus.create({ id: 'clip-selection', parentId: 'clip-to-ima', title: '剪藏选中文本', contexts: ['selection'] });
-    chrome.contextMenus.create({ id: 'clip-url', parentId: 'clip-to-ima', title: '仅保存 URL', contexts: ['page'] });
+    chrome.contextMenus.create({ id: 'save-to-ima', title: '另存到 IMA', contexts: ['page'] });
+    chrome.contextMenus.create({ id: 'save-full', parentId: 'save-to-ima', title: '完整剪藏', contexts: ['page'] });
+    chrome.contextMenus.create({ id: 'save-url', parentId: 'save-to-ima', title: '仅保存 URL', contexts: ['page'] });
   });
 }
 
@@ -400,27 +399,58 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true; // keep message channel open
 });
 
+// ===== 系统通知 =====
+function notifyUser(title, message) {
+  try {
+    chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon128.png',
+      title: title,
+      message: message
+    }).catch(function(err) {
+      console.error('通知发送失败:', err);
+    });
+  } catch (e) {
+    console.error('通知发送异常:', e);
+  }
+}
+
 // ===== 右键菜单点击 =====
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   (async () => {
-    const config = await getConfig();
-    if (!config || !config.connected || !config.selectedKbId) {
-      console.warn('IMA Web Clipper: 未完成设置');
-      return;
+    try {
+      const config = await getConfig();
+      // 使用默认知识库（与弹窗下拉一致），未设置时回退到第一个知识库
+      if (!config || !config.connected || !config.credentials) {
+        notifyUser('另存到 IMA', '请先在插件设置页完成凭证配置');
+        return;
+      }
+      const kbId = config.defaultKbId ||
+        (config.knowledgeBases && config.knowledgeBases.length > 0 && config.knowledgeBases[0].id);
+      if (!kbId) {
+        notifyUser('另存到 IMA', '未找到可用的知识库，请先在弹窗中选择默认知识库');
+        return;
+      }
+
+      let mode;
+      if (info.menuItemId === 'save-full') mode = 'full';
+      else if (info.menuItemId === 'save-url') mode = 'url-only';
+      else return;
+
+      const result = await clipPage({
+        tabId: tab.id,
+        credentials: config.credentials,
+        knowledgeBaseId: kbId,
+        clippingMode: mode
+      });
+      if (result && result.success) {
+        notifyUser('另存到 IMA', mode === 'url-only' ? 'URL 已保存到知识库' : '内容已保存到知识库');
+      } else {
+        notifyUser('另存到 IMA 失败', (result && result.error) || '未知错误');
+      }
+    } catch (e) {
+      notifyUser('另存到 IMA 失败', e.message || String(e));
     }
-
-    let mode = 'full';
-    if (info.menuItemId === 'clip-selection') mode = 'selection';
-    else if (info.menuItemId === 'clip-url') mode = 'url-only';
-    else if (info.menuItemId !== 'clip-full') return;
-
-    const result = await clipPage({
-      tabId: tab.id,
-      credentials: config.credentials,
-      knowledgeBaseId: config.selectedKbId,
-      clippingMode: mode
-    });
-    console.log('右键剪藏结果:', result);
   })();
 });
 

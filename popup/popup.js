@@ -31,13 +31,13 @@ let templates = [];
 let knowledgeBases = [];
 let cachedPreview = null;
 let currentMode = 'full'; // 'full' | 'url'
+let config = null; // 完整配置，用于持久化 lastMode / defaultKbId
 
 // ===== 初始化 =====
 async function initApp() {
   initDOM();
   bindEvents();
 
-  let config = null;
   try { configState = await chrome.runtime.sendMessage({ type: 'GET_CONFIG_STATE' }); } catch (e) { console.warn(e); }
   try { templates = await chrome.runtime.sendMessage({ type: 'GET_TEMPLATES' }); } catch (e) { console.warn(e); }
   try { config = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' }); } catch (e) { console.warn(e); }
@@ -47,6 +47,11 @@ async function initApp() {
   }
   if (config && config.connected) {
     if (!configState.configured) configState.configured = true;
+  }
+
+  // 恢复上次的保存模式（默认 full）
+  if (config && config.lastMode === 'url') {
+    currentMode = 'url';
   }
 
   if (!templates || templates.length === 0) {
@@ -93,6 +98,8 @@ function bindEvents() {
     els.btnClip.textContent = currentMode === 'full'
       ? '✨ 添加到 ima.copilot'
       : '🔗 保存 URL 到 ima.copilot';
+    // 记住上次模式
+    persistConfigField('lastMode', currentMode);
   });
 }
 
@@ -231,12 +238,14 @@ function showState(name) {
 function showReadyState() {
   els.configKbName.textContent = configState.knowledgeBase || '知识库';
   populateKbSelect();
-  // 重置为完整内容模式
-  currentMode = 'full';
-  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'full'));
-  els.panelFull.style.display = 'block';
-  els.panelUrl.style.display = 'none';
-  els.btnClip.textContent = '✨ 添加到 ima.copilot';
+  // 应用记住的保存模式（default lastMode）
+  const mode = currentMode || 'full';
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  els.panelFull.style.display = mode === 'full' ? 'block' : 'none';
+  els.panelUrl.style.display = mode === 'url' ? 'block' : 'none';
+  els.btnClip.textContent = mode === 'full'
+    ? '✨ 添加到 ima.copilot'
+    : '🔗 保存 URL 到 ima.copilot';
 }
 
 // ===== 知识库下拉 =====
@@ -256,11 +265,46 @@ function populateKbSelect() {
     opt.textContent = '📚 ' + (kb.name || '知识库 ' + kb.id);
     els.kbSelect.appendChild(opt);
   });
+  // 默认选中上次保存的知识库（按 ID 匹配，若已不存在则回退到第一项）
+  const defaultKbId = (config && config.defaultKbId) || '';
+  let matched = false;
+  for (const opt of els.kbSelect.options) {
+    if (opt.value === defaultKbId) {
+      opt.selected = true;
+      matched = true;
+      break;
+    }
+  }
+  // 未匹配时选中第一项
+  if (!matched && els.kbSelect.options.length > 0) {
+    els.kbSelect.selectedIndex = 0;
+  }
+  // 若从未保存默认知识库，自动保存当前选中项（右键菜单会用到）
+  if (!config || !config.defaultKbId) {
+    const firstId = els.kbSelect.options[els.kbSelect.selectedIndex]?.value;
+    if (firstId) persistConfigField('defaultKbId', firstId);
+  }
+  // 更新配置栏显示的知识库名称
+  const selName = els.kbSelect.options[els.kbSelect.selectedIndex]?.textContent?.replace('📚 ', '') || '知识库';
+  els.configKbName.textContent = selName;
 }
 
 function onKbChange() {
   const name = els.kbSelect.options[els.kbSelect.selectedIndex]?.textContent?.replace('📚 ', '') || '知识库';
   els.configKbName.textContent = name;
+  // 记住默认知识库
+  persistConfigField('defaultKbId', els.kbSelect.value);
+}
+
+// ===== 配置持久化工具 =====
+async function persistConfigField(key, value) {
+  if (!config) return;
+  config[key] = value;
+  try {
+    await chrome.runtime.sendMessage({ type: 'SAVE_CONFIG', config });
+  } catch (e) {
+    console.warn('保存配置失败:', e);
+  }
 }
 
 // ===== 剪藏 =====
