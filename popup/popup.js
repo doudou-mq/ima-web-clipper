@@ -80,6 +80,8 @@ function bindEvents() {
   els.kbSelect.addEventListener('change', onKbChange);
   els.tplSwitcher.addEventListener('change', function() {
     renderTemplatePreview(this.value);
+    // 记住所选模板，保证保存时与预览一致
+    persistConfigField('selectedTemplateId', this.value);
   });
 
   // 模式切换 — 事件代理
@@ -358,6 +360,7 @@ async function startClip() {
       knowledgeBaseId: kbId,
       title: cachedPreview.title || '无标题',
       markdown: cachedPreview.markdown || '',
+      excerpt: cachedPreview.excerpt || '',
       author: cachedPreview.author || '',
       date: cachedPreview.date || '',
       url: cachedPreview.url || '',

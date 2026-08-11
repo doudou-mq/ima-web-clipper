@@ -163,7 +163,7 @@ function getDemoKbTree() {
 
 // ===== 直接保存（复用预览已处理好的内容，不再提取和转换）=====
 async function saveClippedContent(params) {
-  const { credentials, knowledgeBaseId, title, markdown, author, date, url, accountName } = params;
+  const { credentials, knowledgeBaseId, title, markdown, excerpt, author, date, url, accountName } = params;
   try {
     if (!imaAPI || imaAPI.credentials.clientId !== credentials.clientId) {
       imaAPI = new IMAAPI(credentials);
@@ -175,7 +175,7 @@ async function saveClippedContent(params) {
     const templateEngine = new TemplateEngine();
 
     const markdownContent = templateEngine.processClipping(
-      { title, content: markdown, author, date, accountName },
+      { title, content: markdown, excerpt, author, date, accountName },
       url || '',
       templateContent
     );
