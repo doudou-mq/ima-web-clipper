@@ -19,7 +19,10 @@ function initDOM() {
   els.panelUrl = $('panel-url');
   els.tplSwitcher = $('tpl-switcher');
   els.tplBodyContent = $('tpl-body-content');
-  els.kbSelect = $('kb-select');
+  els.kbDropdown = $('kb-dd');
+  els.kbTrigger = $('kb-dd-trigger');
+  els.kbMenu = $('kb-dd-menu');
+  els.kbLabel = $('kb-dd-label');
   els.btnClip = $('btn-clip');
   els.btnBackToReady = $('btn-back-to-ready');
   els.clipStatusText = $('clip-status-text');
@@ -32,6 +35,7 @@ let knowledgeBases = [];
 let cachedPreview = null;
 let currentMode = 'full'; // 'full' | 'url'
 let config = null; // 完整配置，用于持久化 lastMode / defaultKbId
+let currentKbId = ''; // 当前选中的知识库 ID
 
 // ===== 初始化 =====
 async function initApp() {
@@ -77,7 +81,25 @@ function bindEvents() {
   els.btnConfigLink.addEventListener('click', () => chrome.runtime.openOptionsPage());
   els.btnClip.addEventListener('click', startClip);
   els.btnBackToReady.addEventListener('click', () => showState('ready'));
-  els.kbSelect.addEventListener('change', onKbChange);
+
+  // 自定义知识库下拉
+  els.kbTrigger.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleKbMenu();
+  });
+  els.kbMenu.addEventListener('click', function(e) {
+    const item = e.target.closest('.kb-dd-item');
+    if (!item) return;
+    selectKb(item.dataset.id);
+  });
+  // 点击下拉外部关闭
+  document.addEventListener('click', function() {
+    closeKbMenu();
+  });
+  // ESC 关闭
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeKbMenu();
+  });
   els.tplSwitcher.addEventListener('change', function() {
     renderTemplatePreview(this.value);
     // 记住所选模板，保证保存时与预览一致
@@ -94,8 +116,8 @@ function bindEvents() {
     tab.classList.add('active');
     // 切换面板
     currentMode = tab.dataset.mode;
-    els.panelFull.style.display = currentMode === 'full' ? 'block' : 'none';
-    els.panelUrl.style.display = currentMode === 'url' ? 'block' : 'none';
+    els.panelFull.style.display = currentMode === 'full' ? 'flex' : 'none';
+    els.panelUrl.style.display = currentMode === 'url' ? 'flex' : 'none';
     // 更新按钮文字
     els.btnClip.textContent = currentMode === 'full'
       ? '✨ 添加到 ima.copilot'
@@ -243,8 +265,8 @@ function showReadyState() {
   // 应用记住的保存模式（default lastMode）
   const mode = currentMode || 'full';
   document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
-  els.panelFull.style.display = mode === 'full' ? 'block' : 'none';
-  els.panelUrl.style.display = mode === 'url' ? 'block' : 'none';
+  els.panelFull.style.display = mode === 'full' ? 'flex' : 'none';
+  els.panelUrl.style.display = mode === 'url' ? 'flex' : 'none';
   els.btnClip.textContent = mode === 'full'
     ? '✨ 添加到 ima.copilot'
     : '🔗 保存 URL 到 ima.copilot';
@@ -252,50 +274,96 @@ function showReadyState() {
 
 // ===== 知识库下拉 =====
 function populateKbSelect() {
-  els.kbSelect.innerHTML = '';
+  els.kbMenu.innerHTML = '';
   if (knowledgeBases.length === 0) {
-    const opt = document.createElement('option');
-    opt.value = ''; opt.textContent = '暂无知识库，请前往设置页';
-    els.kbSelect.appendChild(opt);
+    els.kbLabel.textContent = '暂无知识库，请前往设置页';
     els.btnClip.disabled = true;
     return;
   }
   els.btnClip.disabled = false;
-  knowledgeBases.forEach(kb => {
-    const opt = document.createElement('option');
-    opt.value = kb.id;
-    opt.textContent = '📚 ' + (kb.name || '知识库 ' + kb.id);
-    els.kbSelect.appendChild(opt);
-  });
+  const pinned = (config && config.pinnedKbs) || {};
+  // 置顶知识库按置顶时间戳倒序排最前，其余保持原顺序
+  const sortedKbs = knowledgeBases
+    .filter(kb => pinned[kb.id] !== undefined)
+    .sort((a, b) => (pinned[b.id] || 0) - (pinned[a.id] || 0))
+    .concat(knowledgeBases.filter(kb => pinned[kb.id] === undefined));
+
   // 默认选中上次保存的知识库（按 ID 匹配，若已不存在则回退到第一项）
   const defaultKbId = (config && config.defaultKbId) || '';
-  let matched = false;
-  for (const opt of els.kbSelect.options) {
-    if (opt.value === defaultKbId) {
-      opt.selected = true;
-      matched = true;
-      break;
-    }
-  }
-  // 未匹配时选中第一项
-  if (!matched && els.kbSelect.options.length > 0) {
-    els.kbSelect.selectedIndex = 0;
-  }
+  const target = sortedKbs.find(kb => kb.id === defaultKbId) || sortedKbs[0] || null;
+  currentKbId = target ? target.id : '';
+
+  sortedKbs.forEach(kb => {
+    const isPinned = pinned[kb.id] !== undefined;
+    const isSelected = kb.id === currentKbId;
+    const li = document.createElement('li');
+    li.className = 'kb-dd-item' + (isPinned ? ' pinned' : '') + (isSelected ? ' selected' : '');
+    li.dataset.id = kb.id;
+    li.innerHTML =
+      '<span class="kb-dd-name">📚 ' + escapeHtml(kb.name || '知识库 ' + kb.id) + '</span>' +
+      (isPinned ? '<img class="kb-dd-pin" src="../icons/yizhiding.png" alt="已置顶" title="已置顶">' : '');
+    els.kbMenu.appendChild(li);
+  });
+
   // 若从未保存默认知识库，自动保存当前选中项（右键菜单会用到）
   if (!config || !config.defaultKbId) {
-    const firstId = els.kbSelect.options[els.kbSelect.selectedIndex]?.value;
-    if (firstId) persistConfigField('defaultKbId', firstId);
+    if (currentKbId) persistConfigField('defaultKbId', currentKbId);
   }
-  // 更新配置栏显示的知识库名称
-  const selName = els.kbSelect.options[els.kbSelect.selectedIndex]?.textContent?.replace('📚 ', '') || '知识库';
-  els.configKbName.textContent = selName;
+  updateKbLabel();
 }
 
-function onKbChange() {
-  const name = els.kbSelect.options[els.kbSelect.selectedIndex]?.textContent?.replace('📚 ', '') || '知识库';
-  els.configKbName.textContent = name;
-  // 记住默认知识库
-  persistConfigField('defaultKbId', els.kbSelect.value);
+// ===== 自定义下拉：选中 / 开关 / 标签 =====
+function selectKb(id) {
+  currentKbId = id;
+  closeKbMenu();
+  persistConfigField('defaultKbId', id);
+  // 展开时同步高亮当前选中的知识库
+  els.kbMenu.querySelectorAll('.kb-dd-item').forEach(function(item) {
+    item.classList.toggle('selected', item.dataset.id === id);
+  });
+  updateKbLabel();
+}
+
+function updateKbLabel() {
+  const kb = getCurrentKb();
+  els.kbLabel.textContent = kb ? (kb.name || '知识库 ' + kb.id) : '请选择知识库';
+  els.configKbName.textContent = kb ? (kb.name || '知识库') : '知识库';
+}
+
+function getCurrentKb() {
+  return knowledgeBases.find(k => k.id === currentKbId) || null;
+}
+
+function getCurrentKbName() {
+  const kb = getCurrentKb();
+  return kb ? (kb.name || '知识库') : '知识库';
+}
+
+function toggleKbMenu() {
+  const show = els.kbMenu.hidden;
+  els.kbMenu.hidden = !show;
+  els.kbDropdown.classList.toggle('open', show);
+  if (show) {
+    // 下拉若超出弹窗可视区底部，则向上展开
+    const rect = els.kbTrigger.getBoundingClientRect();
+    const menuHeight = els.kbMenu.offsetHeight;
+    const needUp = rect.bottom + menuHeight + 4 > window.innerHeight;
+    els.kbDropdown.classList.toggle('open-up', needUp);
+  } else {
+    els.kbDropdown.classList.remove('open-up');
+  }
+}
+
+function closeKbMenu() {
+  els.kbMenu.hidden = true;
+  els.kbDropdown.classList.remove('open');
+  els.kbDropdown.classList.remove('open-up');
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
 }
 
 // ===== 配置持久化工具 =====
@@ -311,7 +379,7 @@ async function persistConfigField(key, value) {
 
 // ===== 剪藏 =====
 async function startClip() {
-  const kbId = els.kbSelect.value;
+  const kbId = currentKbId;
   if (!kbId) return;
 
   if (currentMode === 'url') {
@@ -336,7 +404,7 @@ async function startClip() {
 
       if (response && response.success) {
         showState('done');
-        els.doneKbLabel.textContent = els.kbSelect.options[els.kbSelect.selectedIndex]?.textContent?.replace('📚 ', '') || '知识库';
+        els.doneKbLabel.textContent = getCurrentKbName();
       } else {
         showState('ready');
       }
@@ -369,7 +437,7 @@ async function startClip() {
 
     if (response && response.success) {
       showState('done');
-      els.doneKbLabel.textContent = els.kbSelect.options[els.kbSelect.selectedIndex]?.textContent?.replace('📚 ', '') || '知识库';
+      els.doneKbLabel.textContent = getCurrentKbName();
     } else {
       showState('ready');
     }

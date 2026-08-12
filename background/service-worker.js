@@ -74,20 +74,17 @@ async function getKbTree() {
       return getDemoKbTree();
     }
 
-    const treeData = [];
-    for (const kb of kbList) {
-      try {
-        const children = await buildKbTreeRecursive(api, kb.id);
-        treeData.push({ id: kb.id, name: kb.name || '知识库', children });
-      } catch (e) {
-        console.warn('获取知识库 "' + kb.name + '" 内容失败:', e);
-        treeData.push({ id: kb.id, name: kb.name || '知识库', children: [] });
-      }
-    }
+    // UE 只展示第一层知识库，不再递归获取文件夹/文档
+    // （buildKbTreeRecursive / getKnowledgeList 接口保留，此处不调用）
+    const treeData = kbList.map(kb => ({
+      id: kb.id,
+      name: kb.name || '知识库',
+      children: []
+    }));
 
     return { success: true, treeData, isDemo: false };
   } catch (e) {
-    console.warn('获取知识库树失败，回退演示数据:', e);
+    console.warn('获取知识库列表失败，回退演示数据:', e);
     return getDemoKbTree();
   }
 }

@@ -103,10 +103,22 @@
     .kb-tree { list-style: none; }
     .kb-root {
       background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px;
-      padding: 14px 16px; margin-bottom: 8px; cursor: pointer;
+      padding: 14px 16px; margin-bottom: 8px; cursor: default;
       display: flex; align-items: center; gap: 10px; transition: all .15s;
     }
     .kb-root:hover { border-color: #C7D2FE; background: #F1F5F9; }
+    .kb-root.pinned { border-color: #A5B4FC; background: #E0E7FF; }
+    .kb-pin {
+      display: inline-flex; align-items: center; gap: 5px;
+      border: 1px solid #E2E8F0; background: #fff; cursor: pointer; font-size: 12px;
+      color: #64748B; padding: 4px 10px; border-radius: 6px; flex-shrink: 0;
+      transition: all .15s; white-space: nowrap;
+    }
+    .kb-pin:hover { background: #F1F5F9; color: #334155; border-color: #CBD5E1; }
+    /* 置顶态按钮：zhiding/quxiaozhiding 图标为黑色，改用浅色底保证可读（深紫实底会看不清黑图标） */
+    .kb-pin.active { background: #EEF2FF; border-color: #A5B4FC; color: #4F46E5; }
+    .kb-pin .kb-pin-btn-ico { width: 14px; height: 14px; }
+    .kb-pin-ico { width: 16px; height: 16px; vertical-align: -3px; margin-left: 4px; }
     .kb-root .kr-icon { width: 30px; height: 30px; border-radius: 7px; background: #EEF2FF; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
     .kb-root .kr-info { flex: 1; }
     .kb-root .kr-info .kr-name { font-weight: 600; font-size: 13px; color: #0F172A; }
@@ -329,18 +341,18 @@
     <div class="panel" id="panel-knowledge">
       <div class="panel-header">
         <h2>📚 知识库</h2>
-        <p>浏览知识库内容并选择目标保存位置</p>
+        <p>查看你账号下的知识库列表</p>
       </div>
       <div class="section" id="sec-kb">
         <div class="section-head">
-          <h3>知识库内容</h3>
+          <h3>知识库列表</h3>
           <span class="badge badge-pending" id="badge-kb">请先测试连接</span>
         </div>
         <p id="kb-help-text" style="font-size:13px;color:#94A3B8;margin-bottom:14px;">
-          连接成功后，点击下方按钮获取知识库的文件夹与文档结构。点击节点展开/折叠，选中文档作为剪藏目标。
+          连接成功后，点击下方按钮获取你的知识库列表。点击卡片右侧的「置顶」可将知识库置顶，置顶的会排在列表最前面；再次点击「取消置顶」即可恢复原顺序。
         </p>
         <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;">
-          <button class="btn btn-primary" id="btn-refresh-kb-tree">🔄 获取知识库结构</button>
+          <button class="btn btn-primary" id="btn-refresh-kb-tree">🔄 获取知识库列表</button>
           <span id="kb-loading-text" style="font-size:12px;color:#94A3B8;display:none;"><span class="spinner"></span> 正在获取...</span>
           <span id="kb-source-label" style="font-size:11px;color:#CBD5E1;display:none;"></span>
         </div>

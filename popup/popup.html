@@ -60,10 +60,16 @@
         </div>
       </div>
 
-      <!-- KB Select -->
+      <!-- KB Dropdown -->
       <div class="form-group">
         <label>目标知识库</label>
-        <select id="kb-select"><option value="">加载中...</option></select>
+        <div class="kb-dd" id="kb-dd">
+          <button class="kb-dd-trigger" id="kb-dd-trigger" type="button">
+            <span id="kb-dd-label">加载中...</span>
+            <span class="kb-dd-arrow">▾</span>
+          </button>
+          <ul class="kb-dd-menu" id="kb-dd-menu" hidden></ul>
+        </div>
       </div>
 
       <button id="btn-clip" class="btn btn-primary btn-full">✨ 添加到 ima.copilot</button>

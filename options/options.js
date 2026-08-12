@@ -40,6 +40,7 @@ let config = null;
 let templates = [];
 let currentTplId = 'default';
 let isConnected = false;
+let lastTreeData = null; // 最近一次获取的知识库列表（置顶切换时本地重排，不重新请求）
 
 // ===== 初始化 =====
 async function initApp() {
@@ -205,16 +206,16 @@ async function loadKbTree() {
   try {
     const response = await chrome.runtime.sendMessage({ type: 'GET_KB_TREE' });
     if (response.success && response.treeData) {
-      renderKbTree(response.treeData);
+      lastTreeData = response.treeData;
+      renderKbTree(sortKbTreeByPin(response.treeData));
       if (response.isDemo) {
         els.kbSourceLabel.textContent = '⚠️ 当前为演示数据（API 不可用）';
         els.kbSourceLabel.style.color = '#D97706';
-        showStatus(els.statusKb, 'warning', '⚠️ API 获取失败，显示演示数据。选中文档可保存选择。');
+        showStatus(els.statusKb, 'warning', '⚠️ API 获取失败，显示演示知识库列表。');
       } else {
-        const count = countTreeItems(response.treeData);
-        els.kbSourceLabel.textContent = `✅ 真实数据 — 共 ${count.total} 个知识库，${count.folders} 个文件夹，${count.files} 个文档`;
+        els.kbSourceLabel.textContent = `✅ 真实数据 — 共 ${response.treeData.length} 个知识库`;
         els.kbSourceLabel.style.color = '#059669';
-        showStatus(els.statusKb, 'success', '✅ 选择一个文档作为剪藏目标位置');
+        showStatus(els.statusKb, 'success', '✅ 知识库列表加载成功');
       }
       els.kbSourceLabel.style.display = 'block';
     } else {
@@ -229,109 +230,59 @@ async function loadKbTree() {
   }
 }
 
-function countTreeItems(tree) {
-  let folders = 0, files = 0;
-  function walk(nodes) {
-    if (!nodes) return;
-    for (const n of nodes) {
-      if (n.type === 'folder') { folders++; walk(n.children); }
-      else if (n.type === 'file') files++;
-    }
-  }
-  tree.forEach(kb => walk(kb.children));
-  return { total: tree.length, folders, files };
-}
-
 function renderKbTree(treeData) {
   els.kbRoot.innerHTML = '';
+  const pinned = (config && config.pinnedKbs) || {};
   treeData.forEach(kb => {
+    const isPinned = pinned[kb.id] !== undefined;
     const root = document.createElement('div');
-    root.className = 'kb-root';
+    root.className = 'kb-root' + (isPinned ? ' pinned' : '');
     root.dataset.kbId = kb.id;
-    root.innerHTML = `<div class="kr-icon">📚</div><div class="kr-info"><div class="kr-name">${escHtml(kb.name)}</div><div class="kr-desc">${kb.children ? kb.children.length : 0} 个项目</div></div><span class="kr-arrow">▶</span>`;
-    root.addEventListener('click', function() {
-      this.classList.toggle('open');
-      if (this.nextElementSibling) this.nextElementSibling.classList.toggle('open');
+    root.innerHTML =
+      '<div class="kr-icon">📚</div>' +
+      '<div class="kr-info"><div class="kr-name">' + escHtml(kb.name) +
+        (isPinned ? '<img class="kb-pin-ico" src="../icons/yizhiding.png" alt="已置顶" title="已置顶">' : '') +
+      '</div></div>' +
+      '<button class="kb-pin' + (isPinned ? ' active' : '') + '" title="' + (isPinned ? '取消置顶' : '置顶') + '">' +
+        '<img class="kb-pin-btn-ico" src="../icons/' + (isPinned ? 'quxiaozhiding.png' : 'zhiding.png') + '" alt="">' +
+        '<span>' + (isPinned ? '取消置顶' : '置顶') + '</span>' +
+      '</button>';
+    root.querySelector('.kb-pin').addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleKbPin(kb.id);
     });
     els.kbRoot.appendChild(root);
-    const container = document.createElement('div');
-    container.className = 'kb-tree-container';
-    const ul = document.createElement('ul');
-    ul.style.cssText = 'list-style:none;';
-    buildTreeNodes(kb.children || [], ul);
-    container.appendChild(ul);
-    els.kbRoot.appendChild(container);
   });
 }
 
-function buildTreeNodes(nodes, parentUl) {
-  nodes.forEach(node => {
-    const li = document.createElement('li');
-    li.className = 'tree-node';
-    li.dataset.id = node.id;
-    li.dataset.type = node.type;
-
-    const row = document.createElement('div');
-    row.className = 'node-row';
-    if (node.type === 'folder') {
-      row.innerHTML = '<span class="nd-arrow">▶</span>';
-    } else {
-      row.innerHTML = '<span class="nd-arrow" style="visibility:hidden;">▶</span>';
-    }
-    row.innerHTML += `<span class="nd-icon">${node.type === 'folder' ? '📁' : '📄'}</span><span class="nd-name">${escHtml(node.name)}</span><span class="nd-check">✓</span>`;
-
-    if (node.type === 'folder') {
-      row.addEventListener('click', function(e) {
-        e.stopPropagation();
-        this.classList.toggle('open');
-        const ch = this.parentElement.querySelector('.tree-children');
-        if (ch) ch.classList.toggle('open');
-      });
-    } else {
-      row.addEventListener('click', function(e) {
-        e.stopPropagation();
-        document.querySelectorAll('.tree-node.selected').forEach(n => n.classList.remove('selected'));
-        li.classList.add('selected');
-        const path = getNodePath(li);
-        showStatus(els.statusKb, 'success', `✅ 已选择：<strong>${escHtml(path)}</strong>`);
-        if (config) {
-          config.selectedKbId = node.id;
-          config.selectedKbName = path;
-          saveConfigToBackground();
-        }
-      });
-    }
-    li.appendChild(row);
-    if (node.children && node.children.length > 0) {
-      const ch = document.createElement('ul');
-      ch.className = 'tree-children';
-      ch.style.cssText = 'list-style:none;';
-      buildTreeNodes(node.children, ch);
-      li.appendChild(ch);
-    }
-    parentUl.appendChild(li);
-  });
+/**
+ * 按置顶时间戳倒序重排知识库列表：置顶的在最前，未置顶保持原顺序
+ */
+function sortKbTreeByPin(treeData) {
+  const pinned = (config && config.pinnedKbs) || {};
+  const pinnedItems = treeData
+    .filter(kb => pinned[kb.id] !== undefined)
+    .sort((a, b) => (pinned[b.id] || 0) - (pinned[a.id] || 0));
+  const unpinnedItems = treeData.filter(kb => pinned[kb.id] === undefined);
+  return pinnedItems.concat(unpinnedItems);
 }
 
-function getNodePath(li) {
-  const parts = [];
-  let current = li;
-  while (current) {
-    if (current.classList.contains('tree-node')) {
-      const n = current.querySelector('.nd-name');
-      if (n) parts.unshift(n.textContent);
-    }
-    current = current.parentElement.closest('.tree-node, .kb-tree-container');
-    if (current && current.classList.contains('kb-tree-container')) {
-      const prev = current.previousElementSibling;
-      if (prev && prev.classList.contains('kb-root')) {
-        const n = prev.querySelector('.kr-name');
-        if (n) parts.unshift(n.textContent);
-      }
-      break;
-    }
+/**
+ * 置顶 / 取消置顶：pinnedKbs = { [kbId]: 置顶时间戳 }
+ */
+function toggleKbPin(kbId) {
+  config = config || {};
+  config.pinnedKbs = config.pinnedKbs || {};
+  if (config.pinnedKbs[kbId] !== undefined) {
+    delete config.pinnedKbs[kbId];
+    showStatus(els.statusKb, 'info', '已取消置顶，知识库恢复原顺序');
+  } else {
+    config.pinnedKbs[kbId] = Date.now();
+    showStatus(els.statusKb, 'success', '✅ 已置顶，知识库已排到列表最前面');
   }
-  return parts.join(' > ');
+  saveConfigToBackground();
+  // 本地重排，无需重新请求接口
+  if (lastTreeData) renderKbTree(sortKbTreeByPin(lastTreeData));
 }
 
 // ===== 模板管理 =====
