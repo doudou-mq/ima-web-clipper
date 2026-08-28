@@ -27,6 +27,15 @@ function initDOM() {
   els.btnBackToReady = $('btn-back-to-ready');
   els.clipStatusText = $('clip-status-text');
   els.doneKbLabel = $('done-kb-label');
+  // 日志面板
+  els.logFloatBtn = $('log-float-btn');
+  els.logPanel = $('log-panel');
+  els.logMask = $('log-mask');
+  els.logBody = $('log-body');
+  els.logCount = $('log-count');
+  els.logFilterErr = $('log-filter-err');
+  els.logClear = $('log-clear');
+  els.logClose = $('log-close');
 }
 
 let configState = { configured: false };
@@ -37,18 +46,164 @@ let currentMode = 'full'; // 'full' | 'url'
 let config = null; // 完整配置，用于持久化 lastMode / defaultKbId
 let currentKbId = ''; // 当前选中的知识库 ID
 
+// ===== 操作日志 =====
+const LOG_KEY = 'ima_clipper_logs';
+const LOG_RETENTION_MS = 2 * 24 * 60 * 60 * 1000; // 保留窗口：2 天
+const LOG_MAX_ENTRIES = 500; // 条数上限
+let logEntries = [];
+let logFlushTimer = null;
+
+function pruneLogs(list, now) {
+  const n = now || Date.now();
+  return list.filter(e => e && typeof e.t === 'number' && n - e.t <= LOG_RETENTION_MS).slice(-LOG_MAX_ENTRIES);
+}
+
+async function loadLogs() {
+  try {
+    const res = await chrome.storage.local.get(LOG_KEY);
+    logEntries = pruneLogs(Array.isArray(res[LOG_KEY]) ? res[LOG_KEY] : []);
+  } catch (e) {
+    logEntries = [];
+  }
+}
+
+function flushLogs() {
+  clearTimeout(logFlushTimer);
+  logFlushTimer = null;
+  try {
+    chrome.storage.local.set({ [LOG_KEY]: pruneLogs(logEntries) });
+  } catch (e) { /* storage 不可用时静默 */ }
+}
+
+function scheduleFlush(immediate) {
+  if (logFlushTimer) clearTimeout(logFlushTimer);
+  logFlushTimer = setTimeout(flushLogs, immediate ? 0 : 500);
+}
+
+// 所有点击/流程的统一日志出口；ERROR 立即落盘，其余防抖 500ms
+function log(level, src, msg, data) {
+  logEntries.push({ t: Date.now(), level: level || 'INFO', src: src || '', msg: msg || '', data: data || {} });
+  scheduleFlush(level === 'ERROR');
+  if (els.logPanel && !els.logPanel.hidden) renderLogs();
+}
+
+// 全局点击代理的取描述：优先 id，其次最近带 id 的祖先+类名，最后标签名；附文本
+function describeClickTarget(el) {
+  if (!el || !el.tagName) return '';
+  let desc = '';
+  if (el.id) {
+    desc = '#' + el.id;
+  } else {
+    const withId = el.closest && el.closest('[id]');
+    if (withId && withId.id) {
+      const cls = (typeof el.className === 'string' && el.className.trim()) ? '.' + el.className.trim().split(' ')[0] : el.tagName.toLowerCase();
+      desc = '#' + withId.id + (el !== withId ? '>' + cls : '');
+    } else if (typeof el.className === 'string' && el.className.trim()) {
+      desc = '.' + el.className.trim().split(' ')[0];
+    } else {
+      desc = el.tagName.toLowerCase();
+    }
+  }
+  const txt = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 24);
+  if (txt) desc += '「' + txt + '」';
+  return desc;
+}
+
+// 日志来源类型 → 中文名称 + 标记颜色（区分不同类型的操作）
+const SRC_META = {
+  initApp:   { label: '初始化',   color: '#059669' },
+  click:     { label: '点击',     color: '#64748B' },
+  'mode-tab': { label: '模式切换', color: '#4F46E5' },
+  tpl:       { label: '模板切换', color: '#0891B2' },
+  'kb-dd':   { label: '知识库',   color: '#7C3AED' },
+  preview:   { label: '预览',     color: '#0D9488' },
+  startClip: { label: '保存流程', color: '#2563EB' },
+  persistConfigField: { label: '配置保存', color: '#D97706' },
+  log:       { label: '日志操作', color: '#94A3B8' }
+};
+function srcMeta(src) {
+  return SRC_META[src] || { label: src || '未知', color: '#64748B' };
+}
+
+// ===== 日志面板 =====
+function toggleLogPanel() {
+  if (els.logPanel.hidden) openLogPanel();
+  else closeLogPanel();
+}
+
+function openLogPanel() {
+  els.logPanel.hidden = false;
+  renderLogs();
+}
+
+function closeLogPanel() {
+  els.logPanel.hidden = true;
+}
+
+async function clearLogs() {
+  logEntries = [];
+  try { await chrome.storage.local.remove(LOG_KEY); } catch (e) {}
+  renderLogs();
+  log('INFO', 'log', '日志已清空');
+}
+
+function renderLogs() {
+  const onlyErr = els.logFilterErr && els.logFilterErr.checked;
+  const list = onlyErr ? logEntries.filter(e => e.level !== 'INFO') : logEntries;
+  els.logCount.textContent = logEntries.length + ' 条';
+  if (!els.logBody) return;
+  els.logBody.innerHTML = '';
+  if (list.length === 0) {
+    els.logBody.innerHTML = '<div style="color:#94A3B8;padding:12px;text-align:center;">暂无日志</div>';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  list.forEach(e => {
+    const row = document.createElement('div');
+    row.className = 'log-row ' + e.level;
+    const d = new Date(e.t);
+    const p = n => String(n).padStart(2, '0');
+    const ts = (d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    let msg = e.msg || '';
+    if (e.data && Object.keys(e.data).length > 0) {
+      try { msg += ' ' + JSON.stringify(e.data); } catch (err) { /* 忽略序列化失败 */ }
+    }
+    const meta = srcMeta(e.src);
+    const srcBadge = '<span class="src" style="color:' + meta.color + ';background:' + meta.color + '1A;border-color:' + meta.color + '40;">' + escapeHtml(meta.label) + '</span>';
+    row.innerHTML =
+      '<span class="lt">' + ts + '</span>' +
+      '<span class="lvl">' + e.level + '</span>' +
+      srcBadge +
+      '<span class="lmsg">' + escapeHtml(msg) + '</span>';
+    frag.appendChild(row);
+  });
+  els.logBody.appendChild(frag);
+  els.logBody.scrollTop = els.logBody.scrollHeight;
+}
+
+// 关弹窗/刷新前兜底落盘，避免丢最新日志
+window.addEventListener('pagehide', function() {
+  if (logFlushTimer) flushLogs();
+});
+
 // ===== 初始化 =====
 async function initApp() {
   initDOM();
   bindEvents();
+  await loadLogs();
+  log('INFO', 'initApp', '弹窗已打开');
 
-  try { configState = await chrome.runtime.sendMessage({ type: 'GET_CONFIG_STATE' }); } catch (e) { console.warn(e); }
-  try { templates = await chrome.runtime.sendMessage({ type: 'GET_TEMPLATES' }); } catch (e) { console.warn(e); }
-  try { config = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' }); } catch (e) { console.warn(e); }
+  try { configState = await chrome.runtime.sendMessage({ type: 'GET_CONFIG_STATE' }); } catch (e) { log('ERROR', 'initApp', '获取配置状态失败', { error: e.message }); }
+  try { templates = await chrome.runtime.sendMessage({ type: 'GET_TEMPLATES' }); } catch (e) { log('ERROR', 'initApp', '获取模板失败', { error: e.message }); }
+  try { config = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' }); } catch (e) { log('ERROR', 'initApp', '获取配置失败', { error: e.message }); }
+
+  log('INFO', 'initApp', '配置状态', { configured: !!configState.configured });
+  log('INFO', 'initApp', '模板数量', { count: templates ? templates.length : 0 });
 
   if (config && config.knowledgeBases && config.knowledgeBases.length > 0) {
     knowledgeBases = config.knowledgeBases;
   }
+  log('INFO', 'initApp', '知识库数量', { count: knowledgeBases.length });
   if (config && config.connected) {
     if (!configState.configured) configState.configured = true;
   }
@@ -101,10 +256,25 @@ function bindEvents() {
     if (e.key === 'Escape') closeKbMenu();
   });
   els.tplSwitcher.addEventListener('change', function() {
+    const tpl = templates.find(t => t.id === this.value);
+    log('INFO', 'tpl', '切换模板', { name: tpl ? tpl.name : this.value });
     renderTemplatePreview(this.value);
     // 记住所选模板，保证保存时与预览一致
     persistConfigField('selectedTemplateId', this.value);
   });
+
+  // 日志面板
+  els.logFloatBtn.addEventListener('click', toggleLogPanel);
+  els.logMask.addEventListener('click', closeLogPanel);
+  els.logClose.addEventListener('click', closeLogPanel);
+  els.logClear.addEventListener('click', clearLogs);
+  els.logFilterErr.addEventListener('change', renderLogs);
+
+  // 全局点击代理：捕获阶段记录弹窗内所有点击（不受 stopPropagation 影响）
+  document.addEventListener('click', function(e) {
+    const desc = describeClickTarget(e.target);
+    if (desc) log('INFO', 'click', '点击 ' + desc);
+  }, true);
 
   // 模式切换 — 事件代理
   els.modeTabs.addEventListener('click', function(e) {
@@ -116,6 +286,7 @@ function bindEvents() {
     tab.classList.add('active');
     // 切换面板
     currentMode = tab.dataset.mode;
+    log('INFO', 'mode-tab', '切换保存模式', { mode: currentMode });
     els.panelFull.style.display = currentMode === 'full' ? 'flex' : 'none';
     els.panelUrl.style.display = currentMode === 'url' ? 'flex' : 'none';
     // 更新按钮文字
@@ -135,6 +306,7 @@ async function loadPagePreview() {
     const [tab] = await chrome.tabs.query({ active: true, windowType: 'normal', status: 'complete' });
     if (!tab || !tab.url || tab.url.startsWith('chrome-extension://') || tab.url.startsWith('chrome://') || tab.url.startsWith('about:')) {
       els.tplBodyContent.innerHTML = '<div style="padding:16px;text-align:center;color:#94A3B8;font-size:12px;">当前页面无法预览</div>';
+      log('WARN', 'preview', '当前页面无法预览', { url: tab ? tab.url : '(无活动标签页)' });
       return;
     }
 
@@ -146,11 +318,14 @@ async function loadPagePreview() {
     if (result.success && result.data) {
       cachedPreview = result.data;
       renderTemplatePreview(els.tplSwitcher.value);
+      log('INFO', 'preview', '页面内容提取成功', { title: result.data.title });
     } else {
       els.tplBodyContent.innerHTML = '<div style="padding:16px;text-align:center;color:#D97706;font-size:12px;">⚠️ 页面内容提取失败: ' + (result.error || '') + '</div>';
+      log('ERROR', 'preview', '页面内容提取失败', { error: result.error || '无错误信息' });
     }
   } catch (e) {
     els.tplBodyContent.innerHTML = '<div style="padding:16px;text-align:center;color:#D97706;font-size:12px;">⚠️ 预览加载失败: ' + e.message + '</div>';
+    log('ERROR', 'preview', '预览加载异常', { error: e.message });
   }
 }
 
@@ -278,6 +453,7 @@ function populateKbSelect() {
   if (knowledgeBases.length === 0) {
     els.kbLabel.textContent = '暂无知识库，请前往设置页';
     els.btnClip.disabled = true;
+    log('WARN', 'kb-dd', '知识库列表为空，添加按钮已禁用');
     return;
   }
   els.btnClip.disabled = false;
@@ -292,6 +468,7 @@ function populateKbSelect() {
   const defaultKbId = (config && config.defaultKbId) || '';
   const target = sortedKbs.find(kb => kb.id === defaultKbId) || sortedKbs[0] || null;
   currentKbId = target ? target.id : '';
+  log('INFO', 'kb-dd', '知识库就绪', { count: knowledgeBases.length, kbId: currentKbId, btnDisabled: els.btnClip.disabled });
 
   sortedKbs.forEach(kb => {
     const isPinned = pinned[kb.id] !== undefined;
@@ -316,6 +493,8 @@ function populateKbSelect() {
 function selectKb(id) {
   currentKbId = id;
   closeKbMenu();
+  const kb = getCurrentKb();
+  log('INFO', 'kb-dd', '选中知识库', { id, name: kb ? kb.name : '' });
   persistConfigField('defaultKbId', id);
   // 展开时同步高亮当前选中的知识库
   els.kbMenu.querySelectorAll('.kb-dd-item').forEach(function(item) {
@@ -341,6 +520,7 @@ function getCurrentKbName() {
 
 function toggleKbMenu() {
   const show = els.kbMenu.hidden;
+  log('INFO', 'kb-dd', show ? '打开知识库下拉' : '关闭知识库下拉');
   els.kbMenu.hidden = !show;
   els.kbDropdown.classList.toggle('open', show);
   if (show) {
@@ -373,6 +553,7 @@ async function persistConfigField(key, value) {
   try {
     await chrome.runtime.sendMessage({ type: 'SAVE_CONFIG', config });
   } catch (e) {
+    log('ERROR', 'persistConfigField', '保存配置失败', { error: e.message });
     console.warn('保存配置失败:', e);
   }
 }
@@ -380,19 +561,29 @@ async function persistConfigField(key, value) {
 // ===== 剪藏 =====
 async function startClip() {
   const kbId = currentKbId;
-  if (!kbId) return;
+  if (!kbId) {
+    log('WARN', 'startClip', 'currentKbId 为空，点击被中止（未选中知识库或列表为空）', { mode: currentMode });
+    return;
+  }
+  log('INFO', 'startClip', '点击保存按钮', { mode: currentMode, kbId });
 
   if (currentMode === 'url') {
     // URL 模式：直接传 URL 给后台
     showState('clipping');
+    log('INFO', 'startClip', '切换到「保存中」状态（URL 模式）');
     try {
       const config = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' });
-      if (!config || !config.credentials) { showState('ready'); return; }
+      if (!config || !config.credentials) {
+        log('WARN', 'startClip', '配置无凭证，回到就绪态');
+        showState('ready'); return;
+      }
 
       const [tab] = await chrome.tabs.query({ active: true, windowType: 'normal', status: 'complete' });
       if (!tab || !tab.url || tab.url.startsWith('chrome-extension://') || tab.url.startsWith('chrome://')) {
+        log('WARN', 'startClip', '当前页面不允许保存', { url: tab ? tab.url : '(无活动标签页)' });
         showState('ready'); return;
       }
+      log('INFO', 'startClip', '发送 CLIP_PAGE', { tabUrl: tab.url });
 
       const response = await chrome.runtime.sendMessage({
         type: 'CLIP_PAGE',
@@ -403,25 +594,36 @@ async function startClip() {
       });
 
       if (response && response.success) {
+        log('INFO', 'startClip', 'URL 保存成功', { kb: getCurrentKbName() });
         showState('done');
         els.doneKbLabel.textContent = getCurrentKbName();
       } else {
+        log('ERROR', 'startClip', 'URL 保存失败', { error: response && response.error ? response.error : '无响应' });
         showState('ready');
       }
     } catch (e) {
+      log('ERROR', 'startClip', 'URL 保存流程异常', { error: e.message });
       showState('ready');
     }
     return;
   }
 
   // MD 模式：复用缓存内容
-  if (!cachedPreview) return;
+  if (!cachedPreview) {
+    log('WARN', 'startClip', '预览内容为空，点击被中止', { mode: currentMode });
+    return;
+  }
   showState('clipping');
+  log('INFO', 'startClip', '切换到「保存中」状态（完整内容模式）');
 
   try {
     const config = await chrome.runtime.sendMessage({ type: 'GET_CONFIG' });
-    if (!config || !config.credentials) { showState('ready'); return; }
+    if (!config || !config.credentials) {
+      log('WARN', 'startClip', '配置无凭证，回到就绪态');
+      showState('ready'); return;
+    }
 
+    log('INFO', 'startClip', '发送 SAVE_CLIPPED_CONTENT', { title: cachedPreview.title || '无标题' });
     const response = await chrome.runtime.sendMessage({
       type: 'SAVE_CLIPPED_CONTENT',
       credentials: config.credentials,
@@ -436,12 +638,15 @@ async function startClip() {
     });
 
     if (response && response.success) {
+      log('INFO', 'startClip', '内容保存成功', { kb: getCurrentKbName() });
       showState('done');
       els.doneKbLabel.textContent = getCurrentKbName();
     } else {
+      log('ERROR', 'startClip', '内容保存失败', { error: response && response.error ? response.error : '无响应' });
       showState('ready');
     }
   } catch (e) {
+    log('ERROR', 'startClip', '内容保存流程异常', { error: e.message });
     showState('ready');
   }
 }

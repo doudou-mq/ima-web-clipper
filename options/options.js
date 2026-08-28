@@ -34,6 +34,17 @@ function initDOMElements() {
   els.tplTabs = $('tpl-tabs');
   els.btnSaveTemplate = $('btn-save-template');
   els.btnResetTemplate = $('btn-reset-template');
+  // 配置管理
+  els.btnExportPreview = $('btn-export-preview');
+  els.btnExportDownload = $('btn-export-download');
+  els.exportPreview = $('export-preview');
+  els.statusExport = $('status-export');
+  els.btnImportSelect = $('btn-import-select');
+  els.importFile = $('import-file');
+  els.importFileName = $('import-file-name');
+  els.importPreview = $('import-preview');
+  els.statusImport = $('status-import');
+  els.btnImportApply = $('btn-import-apply');
 }
 
 let config = null;
@@ -41,11 +52,13 @@ let templates = [];
 let currentTplId = 'default';
 let isConnected = false;
 let lastTreeData = null; // 最近一次获取的知识库列表（置顶切换时本地重排，不重新请求）
+let pendingImportData = null; // 导入文件校验通过后的暂存数据
 
 // ===== 初始化 =====
 async function initApp() {
   initDOMElements();
   bindEvents();
+  renderVersionHistory();
   await loadSavedConfig();
   await loadTemplates();
   renderTplList();
@@ -93,6 +106,15 @@ function bindEvents() {
   // 模板 — 保存 / 重置
   els.btnSaveTemplate.addEventListener('click', handleSaveTemplate);
   els.btnResetTemplate.addEventListener('click', () => selectTemplateById(currentTplId || 'default'));
+
+  // 配置管理 — 导出（先预览，再下载）
+  els.btnExportPreview.addEventListener('click', handleExportPreview);
+  els.btnExportDownload.addEventListener('click', handleExportDownload);
+
+  // 配置管理 — 导入（选文件 → 预览校验 → 更新配置）
+  els.btnImportSelect.addEventListener('click', () => els.importFile.click());
+  els.importFile.addEventListener('change', handleImportFileChange);
+  els.btnImportApply.addEventListener('click', handleImportApply);
 }
 
 function switchPanelSide(panelId) {
@@ -382,6 +404,201 @@ function handleNewTemplate() {
   els.tplEditContent.value = '---\ntitle: "{{title}}"\nauthor: "{{author}}"\ndate: "{{date}}"\nkeywords: []\ntags: []\n---\n\n# {{title}}\n\n{{content}}\n\n[原文链接]({{url}})';
   els.statusTpl.className = 'status-msg';
   renderPreview(els.tplEditContent.value);
+}
+
+// ===== 配置管理：导入 / 导出 =====
+const EXPORT_TYPE = 'ima-web-clipper-export';
+const EXPORT_VERSION = 3; // v3：templates 改为导出完整可见列表（内置+自定义）；v2：知识库相关数据不随导入导出
+
+async function buildExportData() {
+  const res = await chrome.storage.local.get('ima_clipper_config');
+  const cfg = res.ima_clipper_config || {};
+  // 模板用「完整可见列表」（内置 + 自定义）：内置模板不落盘，原始 storage 里只有自定义模板，直接读会为空
+  let tpls = [];
+  try {
+    const r = await chrome.runtime.sendMessage({ type: 'GET_TEMPLATES' });
+    if (Array.isArray(r)) tpls = r;
+  } catch (e) { tpls = []; }
+  return {
+    type: EXPORT_TYPE,
+    version: EXPORT_VERSION,
+    exportedAt: new Date().toISOString(),
+    config: {
+      credentials: cfg.credentials || null,
+      rememberCreds: cfg.rememberCreds,
+      lastMode: cfg.lastMode,
+      selectedTemplateId: cfg.selectedTemplateId
+    },
+    templates: tpls
+  };
+}
+
+async function handleExportPreview() {
+  try {
+    const data = await buildExportData();
+    els.exportPreview.textContent = JSON.stringify(data, null, 2);
+    els.exportPreview.classList.remove('empty');
+    els.btnExportDownload.disabled = false;
+    showStatus(els.statusExport, 'info', '已生成预览，确认内容无误后可点击「导出 JSON 文件」');
+  } catch (e) {
+    showStatus(els.statusExport, 'error', '❌ 生成预览失败: ' + e.message);
+  }
+}
+
+async function handleExportDownload() {
+  try {
+    const data = await buildExportData();
+    const filename = 'ima-web-clipper-config-' + new Date().toISOString().slice(0, 10) + '.json';
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    showStatus(els.statusExport, 'success', '✅ 已导出 ' + filename);
+  } catch (e) {
+    showStatus(els.statusExport, 'error', '❌ 导出失败: ' + e.message);
+  }
+}
+
+async function handleImportFileChange(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  els.importFileName.textContent = file.name;
+  els.btnImportApply.disabled = true;
+  pendingImportData = null;
+  els.importPreview.textContent = '';
+  els.importPreview.classList.add('empty');
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    validateExportData(data);
+    pendingImportData = data;
+    els.importPreview.textContent = JSON.stringify(data, null, 2);
+    els.importPreview.classList.remove('empty');
+    els.btnImportApply.disabled = false;
+    showStatus(els.statusImport, 'success', '✅ 文件校验通过，请确认上方内容后点击「更新配置」');
+  } catch (err) {
+    showStatus(els.statusImport, 'error', '❌ ' + err.message);
+  } finally {
+    els.importFile.value = '';
+  }
+}
+
+function validateExportData(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('文件内容不是有效的 JSON 对象');
+  if (data.type !== EXPORT_TYPE) throw new Error('不是 IMA Web Clipper 的导出文件（缺少 type 标记，请选择正确的导出文件）');
+  if (typeof data.version !== 'number') throw new Error('导出文件缺少 version 版本号');
+  if (data.config === undefined || typeof data.config !== 'object' || Array.isArray(data.config)) throw new Error('config 字段缺失或格式错误');
+  if (data.config.credentials !== undefined && data.config.credentials !== null) {
+    const c = data.config.credentials;
+    if (typeof c !== 'object' || typeof c.clientId !== 'string' || typeof c.apiKey !== 'string') throw new Error('credentials 字段格式错误');
+  }
+  if (data.templates !== undefined && !Array.isArray(data.templates)) throw new Error('templates 字段格式错误');
+  if (Array.isArray(data.templates)) {
+    for (const t of data.templates) {
+      if (!t || typeof t !== 'object' || typeof t.id !== 'string' || typeof t.name !== 'string' || typeof t.content !== 'string') {
+        throw new Error('模板格式错误（每个模板需包含字符串 id / name / content）');
+      }
+    }
+  }
+}
+
+// 导入时强制重置知识库相关数据：知识库列表/默认/置顶/连接状态不随导入恢复，连接后由接口重新获取
+function sanitizeImportedConfig(cfg) {
+  const base = cfg && typeof cfg === 'object' ? cfg : {};
+  return {
+    credentials: base.credentials || null,
+    rememberCreds: base.rememberCreds,
+    lastMode: base.lastMode,
+    selectedTemplateId: base.selectedTemplateId,
+    connected: false,
+    knowledgeBases: []
+  };
+}
+
+// 导入时只把自定义模板写回存储（内置默认模板由模板引擎提供，不落盘，写回也会被合并逻辑过滤）
+function sanitizeImportedTemplates(tpls) {
+  if (!Array.isArray(tpls)) return [];
+  return tpls.filter(t => t && typeof t === 'object' && !t.isDefault);
+}
+
+async function handleImportApply() {
+  if (!pendingImportData) return;
+  const ok = confirm('确认更新配置？当前所有配置与自定义模板将被导入文件内容覆盖，且不可恢复。');
+  if (!ok) return;
+  try {
+    await chrome.storage.local.set({
+      ima_clipper_config: sanitizeImportedConfig(pendingImportData.config),
+      ima_clipper_templates: sanitizeImportedTemplates(pendingImportData.templates)
+    });
+    // 先重置连接态 UI，再重新加载存储内容
+    isConnected = false;
+    els.badgeCred.className = 'badge badge-pending';
+    els.badgeCred.textContent = '未配置';
+    els.secAfterConn.style.display = 'none';
+    els.badgeKb.className = 'badge badge-pending';
+    els.badgeKb.textContent = '请先测试连接';
+    await loadSavedConfig();
+    await loadTemplates();
+    renderTplList();
+    const tplId = config && config.selectedTemplateId;
+    selectTemplateById(templates.some(t => t.id === tplId) ? tplId : 'default');
+    // 清理导入面板
+    pendingImportData = null;
+    els.importPreview.textContent = '';
+    els.importPreview.classList.add('empty');
+    els.importFileName.textContent = '';
+    els.btnImportApply.disabled = true;
+    showStatus(els.statusImport, 'success', '✅ 配置已更新。知识库列表不会随导入恢复，请到「凭证配置」重新测试连接获取');
+  } catch (err) {
+    showStatus(els.statusImport, 'error', '❌ 更新配置失败: ' + err.message);
+  }
+}
+
+// ===== 关于：版本记录（读取 CHANGELOG.md 渲染）=====
+async function renderVersionHistory() {
+  const container = $('version-history');
+  if (!container) return;
+  try {
+    const res = await fetch('../CHANGELOG.md');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const md = await res.text();
+    container.innerHTML = buildVersionHtml(md);
+    const badge = $('badge-version');
+    if (badge) {
+      const m = md.match(/^## \[([^\]]+)\]/m);
+      if (m) badge.textContent = '最新 ' + m[1];
+    }
+  } catch (e) {
+    container.innerHTML = '<p style="color:#94A3B8;font-size:12px;">版本记录加载失败</p>';
+  }
+}
+
+function buildVersionHtml(md) {
+  const blocks = [];
+  let cur = null;
+  const lines = md.split('\n');
+  for (const line of lines) {
+    const vm = line.match(/^## \[([^\]]+)\]\s*-\s*(.+)$/);
+    if (vm) { cur = { version: vm[1], date: vm[2].trim(), sections: [] }; blocks.push(cur); continue; }
+    if (!cur) continue;
+    const sm = line.match(/^###\s+(.+)$/);
+    if (sm) { cur.sections.push({ title: sm[1].trim(), items: [] }); continue; }
+    const bm = line.match(/^-\s+(.+)$/);
+    if (bm && cur.sections.length) cur.sections[cur.sections.length - 1].items.push(bm[1].trim());
+  }
+  if (blocks.length === 0) return '<p style="color:#94A3B8;font-size:12px;">暂无版本记录</p>';
+  return blocks.map(b => {
+    const secs = b.sections.map(s => {
+      const cls = s.title.indexOf('修复') !== -1 ? 'vh-fix' : s.title.indexOf('新增') !== -1 ? 'vh-new' : 'vh-chg';
+      const items = s.items.length ? s.items.map(i => '<li>' + escHtml(i) + '</li>').join('') : '';
+      return '<div class="vh-cat"><span class="vh-cat-tag ' + cls + '">' + escHtml(s.title) + '</span>' + (items ? '<ul class="vh-items">' + items + '</ul>' : '') + '</div>';
+    }).join('');
+    return '<div class="vh-block"><div class="vh-head"><span class="vh-version">v' + escHtml(b.version) + '</span><span class="vh-date">' + escHtml(b.date) + '</span></div>' + secs + '</div>';
+  }).join('');
 }
 
 function showStatus(el, type, msg) {

@@ -95,6 +95,27 @@
     </div>
 
   </div>
+
+  <!-- 浮动日志按钮：fixed 覆盖在弹窗上，不影响布局 -->
+  <button id="log-float-btn" class="log-float-btn" type="button" title="查看操作日志">
+    <img src="../icons/rizhi.png" alt="日志">
+  </button>
+
+  <!-- 日志面板：从底部滑出 -->
+  <div id="log-panel" class="log-panel" hidden>
+    <div id="log-mask" class="log-mask"></div>
+    <div class="log-sheet">
+      <div class="log-sheet-head">
+        <span class="log-sheet-title">📋 操作日志</span>
+        <span class="log-count" id="log-count">0 条</span>
+        <label class="log-filter"><input type="checkbox" id="log-filter-err"> 只看错误</label>
+        <button id="log-clear" class="log-btn" type="button">清空</button>
+        <button id="log-close" class="log-btn" type="button">✕</button>
+      </div>
+      <div class="log-body" id="log-body"></div>
+    </div>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>
