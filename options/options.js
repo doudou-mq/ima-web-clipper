@@ -45,6 +45,14 @@ function initDOMElements() {
   els.importPreview = $('import-preview');
   els.statusImport = $('status-import');
   els.btnImportApply = $('btn-import-apply');
+  // 日志面板
+  els.logCount = $('log-count');
+  els.logFilterErr = $('log-filter-err');
+  els.logSrcFilter = $('log-src-filter');
+  els.logSearch = $('log-search');
+  els.logRefresh = $('log-refresh');
+  els.logClear = $('log-clear');
+  els.logBody = $('log-body');
 }
 
 let config = null;
@@ -59,6 +67,7 @@ async function initApp() {
   initDOMElements();
   bindEvents();
   renderVersionHistory();
+  initLogPanel();
   await loadSavedConfig();
   await loadTemplates();
   renderTplList();
@@ -115,6 +124,13 @@ function bindEvents() {
   els.btnImportSelect.addEventListener('click', () => els.importFile.click());
   els.importFile.addEventListener('change', handleImportFileChange);
   els.btnImportApply.addEventListener('click', handleImportApply);
+
+  // 日志面板
+  els.logFilterErr.addEventListener('change', renderOptionsLogs);
+  els.logSrcFilter.addEventListener('change', renderOptionsLogs);
+  els.logSearch.addEventListener('input', renderOptionsLogs);
+  els.logRefresh.addEventListener('click', refreshOptionsLogs);
+  els.logClear.addEventListener('click', handleClearOptionsLogs);
 }
 
 function switchPanelSide(panelId) {
@@ -125,6 +141,86 @@ function switchPanelSide(panelId) {
   const panel = document.getElementById(panelId);
   if (panel) panel.classList.add('active');
   if (panelId === 'panel-knowledge' && isConnected) loadKbTree();
+}
+
+// ===== 日志面板（共享日志数据来自 lib/logger.js）=====
+function initLogPanel() {
+  // 填充来源筛选
+  Object.keys(SRC_META).forEach(src => {
+    const opt = document.createElement('option');
+    opt.value = src;
+    opt.textContent = SRC_META[src].label;
+    els.logSrcFilter.appendChild(opt);
+  });
+  setLogOnChange(function() { renderOptionsLogs(); });
+  loadLogs().then(function() { renderOptionsLogs(); });
+  // 其他页面（弹窗）写入日志时同步刷新
+  chrome.storage.onChanged.addListener(function(changes, area) {
+    if (area === 'local' && changes[LOG_KEY]) {
+      loadLogs().then(function() { renderOptionsLogs(); });
+    }
+  });
+  log('INFO', 'initApp', '设置页已打开');
+}
+
+function renderOptionsLogs() {
+  const onlyErr = els.logFilterErr && els.logFilterErr.checked;
+  const srcFilter = els.logSrcFilter ? els.logSrcFilter.value : '';
+  const kw = ((els.logSearch && els.logSearch.value) || '').trim().toLowerCase();
+  let list = logEntries;
+  if (onlyErr) list = list.filter(e => e.level !== 'INFO');
+  if (srcFilter) list = list.filter(e => e.src === srcFilter);
+  if (kw) {
+    list = list.filter(e =>
+      (e.msg || '').toLowerCase().indexOf(kw) >= 0 ||
+      JSON.stringify(e.data || {}).toLowerCase().indexOf(kw) >= 0
+    );
+  }
+  els.logCount.textContent = list.length === logEntries.length
+    ? logEntries.length + ' 条'
+    : list.length + ' 条（共 ' + logEntries.length + ' 条）';
+  els.logBody.innerHTML = '';
+  if (list.length === 0) {
+    els.logBody.innerHTML = '<div class="log-empty">暂无日志</div>';
+    return;
+  }
+  const frag = document.createDocumentFragment();
+  list.forEach(e => {
+    const row = document.createElement('div');
+    row.className = 'log-entry ' + e.level;
+    const d = new Date(e.t);
+    const p = n => String(n).padStart(2, '0');
+    const ts = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    const meta = srcMeta(e.src);
+    const badge = '<span class="lsrc" style="color:' + meta.color + ';background:' + meta.color + '1A;border-color:' + meta.color + '40;">' + escHtml(meta.label) + '</span>';
+    let html =
+      '<div class="le-line">' +
+        '<span class="lt">' + ts + '</span>' +
+        '<span class="lvl">' + escHtml(e.level) + '</span>' +
+        badge +
+        '<span class="lmsg">' + escHtml(e.msg || '') + '</span>' +
+      '</div>';
+    if (e.data && Object.keys(e.data).length > 0) {
+      let detail = '';
+      try { detail = JSON.stringify(e.data, null, 2); } catch (err) { detail = String(e.data); }
+      html += '<div class="ledata">' + escHtml(detail) + '</div>';
+    }
+    row.innerHTML = html;
+    frag.appendChild(row);
+  });
+  els.logBody.appendChild(frag);
+  els.logBody.scrollTop = els.logBody.scrollHeight;
+}
+
+async function refreshOptionsLogs() {
+  await loadLogs();
+  renderOptionsLogs();
+}
+
+function handleClearOptionsLogs() {
+  if (!confirm('确认清空全部操作日志？此操作不可恢复。')) return;
+  clearLogs();
+  log('INFO', 'log', '日志已清空');
 }
 
 // ===== 配置管理 =====
@@ -159,6 +255,7 @@ async function handleTestConnection() {
 
   if (!clientId || !apiKey) {
     showStatus(els.connStatus, 'error', '⚠️ 请填写 Client ID 和 API Key');
+    log('WARN', 'conn', '连接测试：未填写 Client ID 或 API Key');
     return;
   }
 
@@ -189,17 +286,20 @@ async function handleTestConnection() {
         `✅ 连接成功！获取到 ${config.knowledgeBases.length} 个知识库。`
       );
       updateConnectedUI();
+      log('INFO', 'conn', '连接测试成功', { count: config.knowledgeBases.length });
     } else {
       els.testConnBtn.textContent = '🔗 测试连接';
       els.testConnBtn.className = 'btn btn-primary';
       els.testConnBtn.disabled = false;
       showStatus(els.connStatus, 'error', `❌ 连接失败: ${response.error}`);
+      log('ERROR', 'conn', '连接测试失败', { error: response.error });
     }
   } catch (e) {
     els.testConnBtn.textContent = '🔗 测试连接';
     els.testConnBtn.className = 'btn btn-primary';
     els.testConnBtn.disabled = false;
     showStatus(els.connStatus, 'error', `❌ 请求失败: ${e.message}`);
+    log('ERROR', 'conn', '连接测试请求异常', { error: e.message });
   }
 }
 
@@ -240,12 +340,15 @@ async function loadKbTree() {
         showStatus(els.statusKb, 'success', '✅ 知识库列表加载成功');
       }
       els.kbSourceLabel.style.display = 'block';
+      log('INFO', 'kb-mgr', '获取知识库列表', { count: response.treeData.length, isDemo: !!response.isDemo });
     } else {
       els.kbRoot.innerHTML = '<p style="color:#94A3B8;font-size:13px;padding:12px;">暂无知识库数据</p>';
       showStatus(els.statusKb, 'info', '当前账号下没有可用的知识库');
+      log('WARN', 'kb-mgr', '知识库列表为空');
     }
   } catch (e) {
     showStatus(els.statusKb, 'error', '获取知识库失败: ' + e.message);
+    log('ERROR', 'kb-mgr', '获取知识库失败', { error: e.message });
   } finally {
     els.btnRefreshKbTree.disabled = false;
     els.kbLoadingText.style.display = 'none';
@@ -380,6 +483,7 @@ async function handleSaveTemplate() {
   const content = els.tplEditContent.value.trim();
   if (!name || !content) {
     showStatus(els.statusTpl, 'error', '⚠️ 请输入模板名称和内容');
+    log('WARN', 'tpl-mgr', '模板保存：名称或内容为空');
     return;
   }
   const existing = templates.find(t => t.id === currentTplId);
@@ -392,9 +496,10 @@ async function handleSaveTemplate() {
       else { templates.push(template); currentTplId = template.id; }
       renderTplList();
       showStatus(els.statusTpl, 'success', '✅ 模板已保存');
+      log('INFO', 'tpl-mgr', '模板已保存', { id: template.id, name: template.name });
       if (config) { config.selectedTemplateId = currentTplId; saveConfigToBackground(); }
-    } else showStatus(els.statusTpl, 'error', '❌ 保存失败');
-  } catch (e) { showStatus(els.statusTpl, 'error', '❌ 保存失败: ' + e.message); }
+    } else { showStatus(els.statusTpl, 'error', '❌ 保存失败'); log('ERROR', 'tpl-mgr', '模板保存失败'); }
+  } catch (e) { showStatus(els.statusTpl, 'error', '❌ 保存失败: ' + e.message); log('ERROR', 'tpl-mgr', '模板保存失败', { error: e.message }); }
 }
 
 function handleNewTemplate() {
@@ -404,6 +509,7 @@ function handleNewTemplate() {
   els.tplEditContent.value = '---\ntitle: "{{title}}"\nauthor: "{{author}}"\ndate: "{{date}}"\nkeywords: []\ntags: []\n---\n\n# {{title}}\n\n{{content}}\n\n[原文链接]({{url}})';
   els.statusTpl.className = 'status-msg';
   renderPreview(els.tplEditContent.value);
+  log('INFO', 'tpl-mgr', '新建模板');
 }
 
 // ===== 配置管理：导入 / 导出 =====
@@ -440,8 +546,10 @@ async function handleExportPreview() {
     els.exportPreview.classList.remove('empty');
     els.btnExportDownload.disabled = false;
     showStatus(els.statusExport, 'info', '已生成预览，确认内容无误后可点击「导出 JSON 文件」');
+    log('INFO', 'config', '生成导出预览', { templates: data.templates.length });
   } catch (e) {
     showStatus(els.statusExport, 'error', '❌ 生成预览失败: ' + e.message);
+    log('ERROR', 'config', '生成导出预览失败', { error: e.message });
   }
 }
 
@@ -458,8 +566,10 @@ async function handleExportDownload() {
     a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
     showStatus(els.statusExport, 'success', '✅ 已导出 ' + filename);
+    log('INFO', 'config', '导出配置已下载', { filename });
   } catch (e) {
     showStatus(els.statusExport, 'error', '❌ 导出失败: ' + e.message);
+    log('ERROR', 'config', '导出失败', { error: e.message });
   }
 }
 
@@ -480,8 +590,10 @@ async function handleImportFileChange(e) {
     els.importPreview.classList.remove('empty');
     els.btnImportApply.disabled = false;
     showStatus(els.statusImport, 'success', '✅ 文件校验通过，请确认上方内容后点击「更新配置」');
+    log('INFO', 'config', '导入文件校验通过', { name: file.name });
   } catch (err) {
     showStatus(els.statusImport, 'error', '❌ ' + err.message);
+    log('ERROR', 'config', '导入文件校验失败', { name: file.name, error: err.message });
   } finally {
     els.importFile.value = '';
   }
@@ -553,8 +665,10 @@ async function handleImportApply() {
     els.importFileName.textContent = '';
     els.btnImportApply.disabled = true;
     showStatus(els.statusImport, 'success', '✅ 配置已更新。知识库列表不会随导入恢复，请到「凭证配置」重新测试连接获取');
+    log('INFO', 'config', '配置导入已应用');
   } catch (err) {
     showStatus(els.statusImport, 'error', '❌ 更新配置失败: ' + err.message);
+    log('ERROR', 'config', '配置导入失败', { error: err.message });
   }
 }
 

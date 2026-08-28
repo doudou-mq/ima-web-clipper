@@ -1,6 +1,6 @@
 {
   "name": "ima-web-clipper",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "一键剪藏网页内容到 IMA 知识库的浏览器插件",
   "main": "background/service-worker.js",
   "scripts": {

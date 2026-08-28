@@ -293,6 +293,45 @@
       padding: 3px 8px; font-size: 12px; font-weight: 600; color: #4F46E5;
       font-family: 'SF Mono', Monaco, monospace;
     }
+
+    /* ===== 日志面板 ===== */
+    .log-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .log-count { font-size: 12px; color: #64748B; margin-right: auto; }
+    .log-check { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #475569; cursor: pointer; }
+    .log-toolbar select, .log-toolbar input[type="search"] {
+      border: 1px solid #E2E8F0; border-radius: 6px; padding: 5px 8px; font-size: 12px; background: #fff; color: #334155; outline: none;
+    }
+    .log-toolbar select:focus, .log-toolbar input[type="search"]:focus { border-color: #A5B4FC; }
+    .log-toolbar input[type="search"] { min-width: 160px; }
+    .log-list {
+      border: 1px solid #E2E8F0; border-radius: 8px; background: #fff;
+      max-height: 420px; overflow-y: auto; font-size: 12px;
+    }
+    .log-empty { padding: 28px 12px; text-align: center; color: #94A3B8; }
+    .log-entry { padding: 8px 12px; border-bottom: 1px solid #F1F5F9; }
+    .log-entry:last-child { border-bottom: none; }
+    .log-entry.ERROR { background: #FEF2F2; border-left: 3px solid #DC2626; }
+    .log-entry.WARN { border-left: 3px solid #F59E0B; }
+    .le-line { display: flex; align-items: center; gap: 8px; }
+    .lt { font-family: 'SF Mono', Monaco, monospace; font-size: 11px; color: #94A3B8; flex-shrink: 0; }
+    .lvl {
+      font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; flex-shrink: 0;
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+    .log-entry.INFO .lvl { background: #E0F2FE; color: #0284C7; }
+    .log-entry.WARN .lvl { background: #FEF3C7; color: #D97706; }
+    .log-entry.ERROR .lvl { background: #FEE2E2; color: #DC2626; }
+    .lsrc {
+      font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;
+      border: 1px solid transparent; flex-shrink: 0; white-space: nowrap;
+    }
+    .lmsg { flex: 1; color: #334155; word-break: break-word; }
+    .ledata {
+      margin-top: 5px; margin-left: 0; padding: 6px 8px; border-radius: 6px;
+      background: #F8FAFC; border: 1px solid #F1F5F9; color: #64748B;
+      font-family: 'SF Mono', Monaco, monospace; font-size: 11px;
+      white-space: pre-wrap; word-break: break-word;
+    }
   </style>
 </head>
 <body>
@@ -309,10 +348,11 @@
       <div class="sidebar-item" data-panel="panel-knowledge">📚 知识库</div>
       <div class="sidebar-item" data-panel="panel-templates">📝 模板管理</div>
       <div class="sidebar-item" data-panel="panel-data">🔄 配置管理</div>
+      <div class="sidebar-item" data-panel="panel-logs">📋 日志</div>
       <div class="sidebar-item" data-panel="panel-guide">📖 使用指南</div>
       <div class="sidebar-item" data-panel="panel-about">ℹ️ 关于</div>
     </nav>
-    <div class="sidebar-footer">v1.6.0 · IMA Web Clipper</div>
+    <div class="sidebar-footer">v1.7.0 · IMA Web Clipper</div>
   </aside>
 
   <!-- ===== CONTENT ===== -->
@@ -575,7 +615,7 @@
         <p>IMA Web Clipper 浏览器扩展</p>
       </div>
       <div class="section">
-        <p style="color:#475569;"><strong>版本：</strong>v1.6.0</p>
+        <p style="color:#475569;"><strong>版本：</strong>v1.7.0</p>
         <p style="color:#475569;"><strong>技术栈：</strong>Manifest V3 · 原生 JS · Readability.js · Turndown.js</p>
         <br>
         <p style="font-weight:600;">功能：</p>
@@ -640,8 +680,30 @@
       </div>
     </div>
 
+    <!-- 日志 -->
+    <div class="panel" id="panel-logs">
+      <div class="panel-header">
+        <h2>📋 操作日志</h2>
+        <p>弹窗与设置页的全部操作日志（保留 2 天 / 上限 500 条，与弹窗共用同一份数据）</p>
+      </div>
+      <div class="section">
+        <div class="log-toolbar">
+          <span class="log-count" id="log-count">0 条</span>
+          <label class="log-check"><input type="checkbox" id="log-filter-err"> 只看错误</label>
+          <select id="log-src-filter">
+            <option value="">全部来源</option>
+          </select>
+          <input type="search" id="log-search" placeholder="搜索消息或详情…">
+          <button class="btn btn-secondary btn-sm" id="log-refresh">🔄 刷新</button>
+          <button class="btn btn-danger btn-sm" id="log-clear">🧹 清空</button>
+        </div>
+        <div class="log-list" id="log-body"><div class="log-empty">暂无日志</div></div>
+      </div>
+    </div>
+
   </main>
 </div>
+<script src="../lib/logger.js"></script>
 <script src="options.js"></script>
 </body>
 </html>
