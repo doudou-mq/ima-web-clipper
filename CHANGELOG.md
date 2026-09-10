@@ -5,6 +5,20 @@
 - 每次**修复一个 bug** → 补丁版本号 +1（如 1.3.1 → 1.3.2）
 - 每次**新增一个功能** → 次版本号 +1（如 1.3.2 → 1.4.0）
 - 版本变更时同步更新：`CHANGELOG.md`、`manifest.json`、`package.json`（及设置页展示的版本号）
+  —— 四处一致性现在由 `scripts/package.js` 在打包前强制校验，漏改会直接构建失败
+
+## [未发布]
+
+### 构建与分发
+- `scripts/release.js` 加固：推送前探测远端可达性（20s 判死，不再干等 75s）；直连不通时自动读取 macOS 系统代理重试
+- 发版可断点续传：tag 已建但上次推送失败时重跑 `npm run release` 会自动补推，不再报"tag 已存在"
+- 推送前先补齐分支，避免 tag 指向远端不存在的 commit；推送完成后轮询 Actions 直到 Release 出包并打印下载地址
+- 失败时输出可复制的重试命令，不再抛 Node child_process 堆栈
+- 新增 `--proxy <url>` 参数显式指定代理
+
+## [1.7.1] - 2026-09-10
+
+首个通过 GitHub Actions 发布的版本：`v1.7.1` tag 触发 CI 自动打包 `ima-web-clipper.zip` 并挂到 Release。插件功能与 1.7.0 相同，无代码改动。
 
 ## [1.7.0] - 2026-08-28
 

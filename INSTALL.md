@@ -271,14 +271,43 @@ npm run keygen -- --write  # 把公钥同步进 manifest.json
 ### 发版
 
 ```bash
-# 1. 提升版本号：manifest.json + package.json + CHANGELOG.md 三处保持一致
-# 2. 提交
-git commit -am "release v1.7.1" && git push
-# 3. 打 tag 并推送 —— Actions 自动打包 zip 并发布到 Release
+# ① 提升版本号 —— 四处必须一致，漏改会被构建拦下
+#    manifest.json  /  package.json  /  options/options.html（两处 v<版本号>）  /  CHANGELOG.md
+# ② 本地验一次
+npm run build
+# ③ 提交并推送
+git add -A && git commit -am "release v1.7.2" && git push
+# ④ 发版
 npm run release
 ```
 
-只想先本地建 tag 不动远端：`npm run release:local`。
+`npm run release` 会依次做：探测远端可达性 → 推分支（有未推的 commit 时）→ 建 tag → 推 tag → 轮询 Actions 直到 Release 出包，最后把下载地址打出来。
+
+只想先本地建 tag、不动远端：`npm run release:local`。
+显式指定代理：`npm run release -- --proxy http://127.0.0.1:8668`。
+
+### 发版卡在"连不上 github.com"
+
+国内直连 github.com:443 常被干扰，表现是干等 75 秒后 `Failed to connect ... port 443`。
+**git 不读 macOS 系统代理**，只认 `http.proxy` 配置或 `https_proxy` 环境变量 —— 浏览器能开 GitHub 不代表 git 能。
+
+- 脚本已处理：直连不通时自动读 `scutil --proxy` 找到本机代理端口并重试（20 秒判死，不等 75 秒）。
+- **可断点续传**：tag 建好了但推送失败，直接重跑 `npm run release` 会识别"本地有、远端没有"并补推，不会报"tag 已存在"。
+- 想让 git 长期走代理（只作用于 github，不影响内网仓库）：
+  ```bash
+  git config --global http.https://github.com.proxy http://127.0.0.1:<代理端口>
+  git config --global --unset http.https://github.com.proxy   # 撤销
+  ```
+  注意端口写死在配置里，代理软件换端口或没启动时 git 会连不上。
+
+### 别误推旧 tag
+
+`git tag --list` 里如果有历史上没推过的旧 tag，推到 GitHub 会生成一个更旧的 Release 并把 `latest` 链接指偏。发版前扫一眼：
+
+```bash
+git tag --list                      # 只应保留远端已有的那些
+git tag -d v1.7.0                   # 误建的本地 tag 直接删，未推过的删掉无副作用
+```
 
 CI：
 - `.github/workflows/release.yml` —— `v*` tag 触发，自动建 Release 并挂 zip。
