@@ -1,6 +1,6 @@
 name: Release
 
-# 推 v1.7.0 这类 tag 时自动打包 zip 并挂到 Release 上
+# 推 v1.7.1 这类 tag 时自动打包 zip 并挂到 Release 上
 on:
   push:
     tags:
