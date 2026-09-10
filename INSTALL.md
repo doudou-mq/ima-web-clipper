@@ -2,42 +2,55 @@
 
 ## 系统要求
 
-- Chrome 88+ 或 Edge 88+ 浏览器
+- 内核 ≥ Chromium 88 的浏览器（Chrome / Edge / QQ浏览器 11+ / 新版 360）
 - IMA 账号和 API 访问权限
 - 有效的 Client ID 和 API Key
 
-## 安装步骤
+## 获取安装包
 
-### 方法一：开发模式安装（推荐）
+发布产物在 GitHub Releases，两个文件内容相同：
 
-1. **下载插件文件**
-   - 克隆或下载本项目到本地
-   - 确保 `ima-web-clipper` 目录完整
+| 文件 | 用途 |
+|------|------|
+| `ima-web-clipper.zip` | 稳定文件名，配 `releases/latest/download/` 写进文档不会失效 |
+| `ima-web-clipper-<版本号>.zip` | 归档某一次的具体版本 |
 
-2. **打开浏览器扩展管理页面**
-   - Chrome: 输入 `chrome://extensions/`
-   - Edge: 输入 `edge://extensions/`
+```bash
+curl -L -o ima-web-clipper.zip \
+  https://github.com/doudou-mq/ima-web-clipper/releases/latest/download/ima-web-clipper.zip
+```
 
-3. **开启开发者模式**
-   - 在扩展管理页面右上角，打开"开发者模式"开关
+## 安装步骤（四个浏览器通用）
 
-4. **加载插件**
-   - 点击"加载已解压的扩展程序"按钮
-   - 选择 `ima-web-clipper` 目录
-   - 插件将自动加载并显示在工具栏中
+zip 解压后是单层目录 `ima-web-clipper/`，`manifest.json` 就在它下面。
 
-### 方法二：打包安装
+1. **解压到一个固定目录** —— 别在压缩包的临时预览窗口里直接加载，也别解压完就挪走。
+   浏览器记住的是**文件夹路径**，路径一变扩展就失效，表现就是重启后"已删除"或"无法加载扩展程序"。
+   建议放 `D:\browser-extensions\ima-web-clipper` 这种不会动的位置。
+2. **打开扩展管理页面**
+   - Chrome / QQ浏览器 / 360：`chrome://extensions/`
+   - Edge：`edge://extensions/`
+3. **开启开发者模式**（页面右上角开关）
+4. **加载插件** —— 点"加载已解压的扩展程序"，选第 1 步那个**文件夹本身**
+   （不是选 zip 文件，也不是选文件夹里的 `manifest.json`）
 
-1. **打包插件**
-   ```bash
-   # 在 ima-web-clipper 目录中
-   zip -r ima-web-clipper.zip . -x "*.git*" "*.DS_Store"
-   ```
+扩展 ID 已固定在 `piccfkjngomjhpbmlabnheidblehleai`，四个浏览器加载得到同一个 ID。
 
-2. **安装打包文件**
-   - 打开扩展管理页面
-   - 将打包的 `.zip` 文件拖放到页面中
-   - 确认安装
+### 各浏览器的差异
+
+| 浏览器 | 本地 zip / crx | 说明 |
+|--------|----------------|------|
+| Chrome | 都可拖拽安装 | 但拖拽会解压到临时目录，重启后失效；日常仍推荐上面的"加载已解压" |
+| Edge | **都不支持** | 扩展页只有"加载已解压的扩展程序"一个入口。硬塞 crx 会被判为未知来源，装上后自动删除并提示"插件已删除" |
+| QQ浏览器 11+ | 支持加载已解压 | 内核 Chromium 94，满足 MV3 要求 |
+| 360 安全/极速浏览器 | 取决于内核版本 | 内核 ≥88 才能装 MV3。地址栏 `chrome://help` 或 设置→关于 查看版本；低于 88 会报"使用了不受支持的清单版本"，只能升级浏览器或改用 Chrome / Edge |
+| Firefox | 不支持 | 依赖 Chrome 扩展 API，需另行移植 |
+
+### 为什么只发 zip、不发 .crx
+
+- Edge 从设计上不认本地 crx：非商店来源且 ID 不在 Edge 加载项目录里的，会被后台校验停用并删除。
+- Chrome 拖 crx / 拖 zip 装出来的扩展解压在临时目录，下次启动就没了，还会挂"未列在网上应用店中"的黄条警告。
+- 唯一在四个浏览器上行为一致的安装法就是"解压到固定目录 + 加载已解压"，所以发布物只需要一个 zip。
 
 ## 首次配置
 
@@ -156,6 +169,24 @@
 
 ## 故障排除
 
+### 安装类问题
+
+#### Edge 添加后提示"插件已删除"
+你在装 `.crx`。Edge 不认本地 crx：它拿 crx 签名公钥派生出的 ID 去 Edge 加载项目录里查，查不到就判定为未知来源侧载，装上后几秒或下次启动时自动卸载。
+**解决**：改用 zip + "加载已解压的扩展程序"，见上文安装步骤。
+
+#### 提示"无法加载扩展程序"或重启后扩展消失
+解压目录是临时路径（压缩包预览窗口里直接加载），或事后把文件夹挪走/改名了。
+**解决**：解压到固定目录 → 在扩展页移除失效条目 → 重新"加载已解压"。
+
+#### 360 上报"使用了不受支持的清单版本"
+本插件是 Manifest V3，需要内核 ≥ Chromium 88；部分 360 版本停在 86。
+**解决**：地址栏 `chrome://help` 确认内核版本，升级 360 到新版，或改用 Chrome / Edge / QQ浏览器 11+。
+
+#### 每次打包扩展 ID 都变、配置丢失
+manifest 里没有 `key` 时，"加载已解压"的 ID 由**解压路径**决定，换台机器就换一个 ID。
+**解决**：本仓库已在 manifest.json 固定 `key`，ID 恒为 `piccfkjngomjhpbmlabnheidblehleai`。要改回去请执行 `npm run keygen`（见下文"构建与发布"）。
+
 ### 常见问题
 
 #### 1. 连接测试失败
@@ -204,6 +235,56 @@
 1. 进入扩展管理页面
 2. 找到 IMA Web Clipper
 3. 点击"移除"然后重新安装
+
+## 构建与发布
+
+### 本地打包
+
+```bash
+npm run build      # 或 node scripts/package.js
+```
+
+产出：
+
+```
+dist/ima-web-clipper/                 直接可"加载已解压"的目录
+dist/ima-web-clipper.zip              稳定名，给下载链接用
+dist/ima-web-clipper-<版本号>.zip      归档用
+```
+
+打包脚本走**白名单**（`manifest.json` + `background/ content/ lib/ popup/ options/ icons/ assets/`），并在压缩前校验：manifest 引用到的每个文件都在、manifest 与 package.json 版本一致、`key` 字段存在。任何一项不过就退出非 0，不会产出一个装不上的包。
+顺手剔除 `icons/` 里的出图脚本和 `*.base64`，以及所有非 ASCII 文件名（中文文件名在 Windows 自带解压下会乱码导致图标裂）。
+
+### 扩展 ID 与密钥
+
+`manifest.json` 的 `key` 决定扩展 ID，私钥在 `keys/ima-web-clipper-private.pem`（已被 .gitignore 排除）。
+
+```bash
+npm run keygen          # 查看当前 ID、校验 manifest.key 与私钥是否一致
+npm run keygen -- --write  # 把公钥同步进 manifest.json
+```
+
+- **私钥必须备份**：它一旦丢了，重新生成的就是另一个 ID，对已安装用户等于换了一个插件。
+- 只有以后要出 `.crx` 或上架商店时才用得到私钥；发 zip 用不上它。
+- 将来上架 Chrome Web Store / Edge Add-ons 后，ID 由商店用你的开发者账号重新签发，`key` 只影响手动加载这条路径。
+
+### 发版
+
+```bash
+# 1. 提升版本号：manifest.json + package.json + CHANGELOG.md 三处保持一致
+# 2. 提交
+git commit -am "release v1.7.1" && git push
+# 3. 打 tag 并推送 —— Actions 自动打包 zip 并发布到 Release
+npm run release
+```
+
+只想先本地建 tag 不动远端：`npm run release:local`。
+
+CI：
+- `.github/workflows/release.yml` —— `v*` tag 触发，自动建 Release 并挂 zip。
+- `.github/workflows/verify.yml` —— 每次 push main / PR 都跑一遍打包，并断言 `.git`、`*.pem`、README、docs、test 不会混进产物。
+
+> 不要把 zip commit 进仓库：二进制进 git 历史后每次发版都永久增大仓库体积，且无法真正删除。走 Releases 附件。
 
 ## 安全注意事项
 

@@ -3,6 +3,8 @@
   "name": "IMA Web Clipper",
   "version": "1.7.0",
   "description": "一键剪藏网页内容到 IMA 知识库",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvBnZXnfSCtPiGa+eRV6KNBtF6/5HrtOsZOAhYoW3hNEA7xNlD0g17Ndm0coSfVvXUQ4k/9ZlI7w4Hd2hSj+V/bmHildmDqU+Htr03C7kPk3hLAp9EqXQgXUGu6YkFRMekUK9qhx7NWJsRyQ3HiFmw0gOypCMtkfuBQPsmQFFY4KhIr8jsFe0p/PqO5yvgwNLayTOyt46eHi5GSwv5xHL4WLhj9KxVff0+MpZmJ5Ny2/7WaiwMosoA2a6S3j2ifja+vb8vKs9MsLlho/zM19oTi8u+lJxlWl/7+uaAo4HvfOayNXjzQbwSnlIefk6HXuEZiogn2emf59aaq2gCrKvUwIDAQAB",
+  "minimum_chrome_version": "88",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

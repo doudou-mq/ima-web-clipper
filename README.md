@@ -15,13 +15,14 @@
 
 ## 安装方法
 
-### 开发模式
-1. 克隆或下载本项目
-2. 打开 Chrome/Edge 浏览器
-3. 进入扩展管理页面（`chrome://extensions/` 或 `edge://extensions/`）
-4. 开启"开发者模式"
-5. 点击"加载已解压的扩展程序"
-6. 选择本项目目录
+发布物是 zip，不发 .crx（Edge 不认本地 crx，装上会被自动删除）。详细分浏览器说明见 [INSTALL.md](./INSTALL.md)。
+
+1. 从 [Releases](https://github.com/doudou-mq/ima-web-clipper/releases/latest) 下载 `ima-web-clipper.zip`
+2. **解压到一个固定目录**（浏览器记的是路径，挪走就失效）
+3. 扩展管理页开「开发者模式」：Chrome / QQ浏览器 / 360 用 `chrome://extensions/`，Edge 用 `edge://extensions/`
+4. 点「加载已解压的扩展程序」，选解压出的 `ima-web-clipper` 文件夹
+
+扩展 ID 已固定在 `piccfkjngomjhpbmlabnheidblehleai`。360 需内核 ≥ Chromium 88。
 
 ### 生产模式
 待发布到 Chrome Web Store 和 Edge Add-ons 商店。

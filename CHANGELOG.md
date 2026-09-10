@@ -13,6 +13,13 @@
 - 日志面板支持「只看错误」、按来源筛选、关键词搜索、手动刷新、一键清空
 - 日志模块抽取为共享模块（`lib/logger.js`），弹窗与设置页共用同一份数据；设置页关键操作（连接测试 / 导入导出 / 模板增删改 / 配置保存）也接入日志
 
+### 构建与分发
+- `manifest.json` 增加 `key` 固定扩展 ID（`piccfkjngomjhpbmlabnheidblehleai`）与 `minimum_chrome_version: "88"`：四个浏览器加载得到同一 ID，换解压目录不再丢配置
+- 新增 `scripts/package.js` 白名单打包（替代旧 `build.js`：其排除正则匹配不到顶层 `.git`，会把仓库历史、docs、test 一起打进产物）；压缩前校验 manifest 引用完整性与四处版本号一致
+- 新增 `scripts/gen-key.js`（查看/同步 ID 与公钥）、`scripts/release.js`（打 tag 触发发版）
+- 新增 GitHub Actions：`v*` tag 自动发布 zip 到 Release；push/PR 校验产物内容干净
+- 发布物只出 zip 不出 crx —— Edge 不认本地 crx，装上会被判未知来源后自动删除
+
 ## [1.6.0] - 2026-08-28
 
 ### 新增

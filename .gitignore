@@ -1,4 +1,17 @@
+# 签名私钥：绝不能提交。丢了它，已发布扩展的 ID 和商店归属就找不回来
+keys/
+*.pem
+
+# 构建产物
+dist/
+*.zip
+*.crx
+
+# 编辑器 / 系统
 .vscode
+.DS_Store
+
+# 仅本地参考，不随插件发布
 docs
 test
-.DS_Store
+node_modules/

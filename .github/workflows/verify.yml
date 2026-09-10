@@ -1,0 +1,38 @@
+name: Verify
+
+# 每次改动都验证「zip 能被浏览器加载」，别等发版才发现漏文件
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 打包并校验 manifest 引用完整性
+        run: node scripts/package.js
+
+      - name: 私钥、仓库历史、文档不得进入产物
+        run: |
+          set -e
+          cd dist
+          zip -sf ima-web-clipper.zip > listing.txt
+          if grep -qE '\.git/|\.pem$|README\.md|INSTALL\.md|docs/|test/|\.DS_Store' listing.txt; then
+            echo "::error::产物里混进了不该有的文件："
+            grep -E '\.git/|\.pem$|README\.md|INSTALL\.md|docs/|test/|\.DS_Store' listing.txt
+            exit 1
+          fi
+          echo "✓ 产物内容干净"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ima-web-clipper
+          path: dist/ima-web-clipper.zip
+          if-no-files-found: error
